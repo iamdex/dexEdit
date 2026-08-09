@@ -27,10 +27,13 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+      # Only the catalog, so the entitlements file beside it stays out of the bundle.
+      - path: Resources/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit
         PRODUCT_NAME: dexEdit
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: Resources/dexEdit.entitlements
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
