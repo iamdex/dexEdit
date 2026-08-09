@@ -24,7 +24,7 @@ struct ContentView: View {
                     }
                 }
             } else {
-                FolderPickerPrompt()
+                WelcomeView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,29 +97,3 @@ private struct EditorPane: View {
     }
 }
 
-private struct FolderPickerPrompt: View {
-    @EnvironmentObject private var folderStore: NotesFolderStore
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("Choose a notes folder")
-                .font(.title2)
-            Text("Your notes are plain .md files kept in a folder you pick.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            if let error = folderStore.errorMessage {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
-            Button("Choose Folder…") {
-                folderStore.chooseFolder()
-            }
-            .keyboardShortcut(.defaultAction)
-            .padding(.top, 4)
-        }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-    }
-}
