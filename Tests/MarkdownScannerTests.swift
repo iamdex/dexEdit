@@ -33,6 +33,30 @@ final class MarkdownScannerTests: XCTestCase {
         )
     }
 
+    func testHeadingTextStopsBeforeTheNewline() {
+        // "## Title\nnext" — the heading's font must not be applied to the
+        // line terminator, or it drags the line spacing with it.
+        let result = spans("## Title\nnext")
+
+        XCTAssertEqual(
+            firstRange(result, .headingText(level: 2)),
+            NSRange(location: 3, length: 5),
+            "the span covers \"Title\" and not the newline after it"
+        )
+    }
+
+    func testQuoteTextStopsBeforeTheNewline() {
+        let result = spans("> quoted\nnext")
+
+        XCTAssertEqual(firstRange(result, .quoteText), NSRange(location: 2, length: 6))
+    }
+
+    func testInlineSpansStopBeforeTheNewline() {
+        let result = spans("**bold**\nnext")
+
+        XCTAssertEqual(firstRange(result, .bold), NSRange(location: 2, length: 4))
+    }
+
     func testHashWithoutASpaceIsNotAHeading() {
         let result = spans("#tag is not a heading")
 

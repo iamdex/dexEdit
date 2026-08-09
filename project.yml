@@ -50,6 +50,8 @@ targets:
       # The logic under test is pure, so it is compiled straight into the test
       # bundle. No app is launched to exercise string functions.
       - path: Sources/Notes/Note.swift
+      - path: Sources/Notes/NotesLibrary.swift
+      - path: Sources/LaunchTimer.swift
       - path: Sources/Editor/MarkdownScanner.swift
       - path: Sources/Editor/MarkdownFormatter.swift
       - path: Sources/Editor/ActiveFormats.swift

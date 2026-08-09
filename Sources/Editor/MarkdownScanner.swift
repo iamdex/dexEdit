@@ -84,7 +84,13 @@ enum MarkdownScanner {
             return [MarkdownSpan(range: lineRange, kind: .codeBlock)]
         }
 
-        let chars = Array(text.substring(with: lineRange).utf16)
+        // The line terminator is not part of the line's content. Styling it
+        // would drag a heading's font, or a quote's colour, onto the newline.
+        var chars = Array(text.substring(with: lineRange).utf16)
+        while let last = chars.last, last == C.newline || last == C.carriageReturn {
+            chars.removeLast()
+        }
+
         let base = lineRange.location
         guard !chars.isEmpty else { return [] }
 
