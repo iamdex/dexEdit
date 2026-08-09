@@ -74,8 +74,12 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.replaceText(with: text)
 
-        // The menu bar reaches the editor through here.
+        // The menu bar and the formatting bar reach the editor through here.
         bridge.textView = textView
+        context.coordinator.onSelectionChanged = { [weak bridge] in
+            bridge?.refreshActiveFormats()
+        }
+        bridge.refreshActiveFormats()
 
         if bridge.wantsEditorFocus {
             bridge.wantsEditorFocus = false
@@ -104,6 +108,9 @@ struct MarkdownTextView: NSViewRepresentable {
         @Binding private var text: String
         var mode: EditorMode
         weak var textView: NSTextView?
+
+        /// Tells the formatting bar the cursor moved.
+        var onSelectionChanged: (() -> Void)?
 
         init(text: Binding<String>, mode: EditorMode) {
             _text = text
@@ -137,6 +144,11 @@ struct MarkdownTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+            onSelectionChanged?()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            onSelectionChanged?()
         }
 
         // MARK: - NSTextStorageDelegate

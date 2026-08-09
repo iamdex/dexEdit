@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var folderStore: NotesFolderStore
     @EnvironmentObject private var library: NotesLibrary
+    @AppStorage("showFormatBar") private var showFormatBar = true
 
     var body: some View {
         Group {
@@ -14,6 +15,14 @@ struct ContentView: View {
                     EditorPane()
                 }
                 .navigationTitle(library.note(library.selection)?.summary.title ?? "dexEdit")
+                .toolbar {
+                    if showFormatBar {
+                        ToolbarItemGroup(placement: .automatic) {
+                            EditorToolbar(isEnabled: library.selection != nil)
+                                .disabled(library.selection == nil)
+                        }
+                    }
+                }
             } else {
                 FolderPickerPrompt()
             }

@@ -34,6 +34,14 @@ enum MarkdownScanner {
     struct FenceMap {
         private let delimiters: [NSRange]
 
+        private init(delimiters: [NSRange]) {
+            self.delimiters = delimiters
+        }
+
+        /// For callers that only care about one line's inline markup and don't
+        /// want to pay for a document-wide scan to find out about fences.
+        static let ignoringFences = FenceMap(delimiters: [])
+
         init(text: NSString) {
             var found: [NSRange] = []
             let length = text.length

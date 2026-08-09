@@ -5,7 +5,9 @@ struct dexEditApp: App {
     @StateObject private var folderStore = NotesFolderStore()
     @StateObject private var library = NotesLibrary()
     @StateObject private var bridge = EditorBridge()
+    @StateObject private var formatState = FormatState()
     @AppStorage("editorMode") private var mode: EditorMode = .styled
+    @AppStorage("showFormatBar") private var showFormatBar = true
 
     init() {
         LaunchTimer.mark("app init")
@@ -19,6 +21,8 @@ struct dexEditApp: App {
                 .environmentObject(folderStore)
                 .environmentObject(library)
                 .environmentObject(bridge)
+                .environmentObject(formatState)
+                .onAppear { bridge.formatState = formatState }
         }
         .defaultSize(width: 1000, height: 700)
         .commands {
@@ -42,6 +46,9 @@ struct dexEditApp: App {
 
             CommandGroup(after: .sidebar) {
                 Divider()
+                Toggle("Show Formatting Bar", isOn: $showFormatBar)
+
+                Divider()
                 Button("Search Notes") {
                     bridge.focus(.search)
                 }
@@ -58,8 +65,19 @@ struct dexEditApp: App {
                     .keyboardShortcut("b", modifiers: .command)
                 Button("Italic") { bridge.toggleItalic() }
                     .keyboardShortcut("i", modifiers: .command)
+                Button("Strikethrough") { bridge.toggleStrike() }
+                Button("Inline Code") { bridge.toggleCode() }
+
+                Divider()
+
+                Button("Bullet List") { bridge.toggleBulletList() }
+                Button("Blockquote") { bridge.toggleQuote() }
+
+                Divider()
+
                 Button("Link") { bridge.insertLink() }
                     .keyboardShortcut("k", modifiers: .command)
+                Button("Image") { bridge.insertImage() }
 
                 Divider()
 

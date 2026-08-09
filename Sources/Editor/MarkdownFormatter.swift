@@ -70,6 +70,46 @@ enum MarkdownFormatter {
         )
     }
 
+    /// Wraps the selection as an image with the cursor waiting inside the
+    /// parens. This writes markdown text and nothing else — the app does not
+    /// display images, by design.
+    static func image(in text: NSString, selection: NSRange) -> TextEdit {
+        let selected = text.substring(with: selection)
+        let cursor = selection.location + 2 + (selected as NSString).length + 2
+        return TextEdit(
+            range: selection,
+            replacement: "![\(selected)]()",
+            selection: NSRange(location: cursor, length: 0)
+        )
+    }
+
+    /// Adds or removes a line prefix such as `- ` or `> `, after any indent.
+    static func toggleLinePrefix(in text: NSString, selection: NSRange, prefix: String) -> TextEdit {
+        let lineRange = text.lineRange(for: selection)
+        let line = Array(text.substring(with: lineRange).utf16)
+
+        var indent = 0
+        while indent < line.count, line[indent] == 32 || line[indent] == 9 { indent += 1 }
+
+        let start = lineRange.location + indent
+        let prefixLength = (prefix as NSString).length
+        let hasPrefix = start + prefixLength <= text.length
+            && text.substring(with: NSRange(location: start, length: prefixLength)) == prefix
+
+        let replacement = hasPrefix ? "" : prefix
+        let removed = hasPrefix ? prefixLength : 0
+        let delta = (replacement as NSString).length - removed
+
+        return TextEdit(
+            range: NSRange(location: start, length: removed),
+            replacement: replacement,
+            selection: NSRange(
+                location: max(lineRange.location, selection.location + delta),
+                length: selection.length
+            )
+        )
+    }
+
     /// Sets the current line to a heading, or strips it if it is already that
     /// level. Any existing heading marker is replaced, not stacked.
     static func toggleHeading(in text: NSString, selection: NSRange, level: Int) -> TextEdit {
