@@ -4,6 +4,7 @@ import SwiftUI
 struct dexEditApp: App {
     @StateObject private var folderStore = NotesFolderStore()
     @StateObject private var library = NotesLibrary()
+    @StateObject private var bridge = EditorBridge()
     @AppStorage("editorMode") private var mode: EditorMode = .styled
 
     init() {
@@ -16,6 +17,7 @@ struct dexEditApp: App {
             ContentView()
                 .environmentObject(folderStore)
                 .environmentObject(library)
+                .environmentObject(bridge)
         }
         .defaultSize(width: 1000, height: 700)
         .commands {
@@ -33,6 +35,39 @@ struct dexEditApp: App {
             CommandGroup(replacing: .saveItem) {
                 // Deliberately empty: there is no save command in this app.
             }
+
+            CommandGroup(after: .sidebar) {
+                Divider()
+                Button("Search Notes") {
+                    bridge.focus(.search)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+
+                Button("Note List") {
+                    bridge.focus(.list)
+                }
+                .keyboardShortcut("l", modifiers: .command)
+            }
+
+            CommandMenu("Format") {
+                Button("Bold") { bridge.toggleBold() }
+                    .keyboardShortcut("b", modifiers: .command)
+                Button("Italic") { bridge.toggleItalic() }
+                    .keyboardShortcut("i", modifiers: .command)
+                Button("Link") { bridge.insertLink() }
+                    .keyboardShortcut("k", modifiers: .command)
+
+                Divider()
+
+                ForEach(1...6, id: \.self) { level in
+                    Button("Heading \(level)") { bridge.toggleHeading(level: level) }
+                        .keyboardShortcut(
+                            KeyEquivalent(Character("\(level)")),
+                            modifiers: .command
+                        )
+                }
+            }
+
             CommandMenu("Note") {
                 Button(mode == .styled ? "Show Raw Markdown" : "Show Styled Markdown") {
                     mode.toggle()

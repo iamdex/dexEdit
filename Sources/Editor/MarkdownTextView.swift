@@ -9,6 +9,7 @@ import SwiftUI
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
     var mode: EditorMode
+    var bridge: EditorBridge
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, mode: mode)
@@ -72,6 +73,9 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.textView = textView
         context.coordinator.replaceText(with: text)
+
+        // The menu bar reaches the editor through here.
+        bridge.textView = textView
 
         DispatchQueue.main.async {
             textView.window?.makeFirstResponder(textView)

@@ -245,6 +245,66 @@ final class NotesLibrary: ObservableObject {
         }
     }
 
+    // MARK: - External changes
+
+    /// Picks up edits made by other tools — Obsidian, a sync client, `vim`.
+    /// Runs when the window becomes key, which is when the user could have been
+    /// somewhere else. Real FSEvents watching is a later problem.
+    func syncWithDisk() {
+        guard let folderURL else { return }
+
+        // Commit our own work first, so "newer on disk" means what it says.
+        flushPending()
+
+        let keys: [URLResourceKey] = [.contentModificationDateKey]
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        ) else { return }
+
+        let onDisk = contents.filter { $0.pathExtension.lowercased() == "md" }
+        let known = Set(notes.compactMap(\.fileURL))
+        var changed = false
+
+        // Files that vanished while we weren't looking.
+        for note in notes where note.fileURL != nil {
+            guard let url = note.fileURL, !onDisk.contains(url) else { continue }
+            notes.removeAll { $0.id == note.id }
+            savedText.removeValue(forKey: note.id)
+            changed = true
+        }
+
+        for url in onDisk {
+            let modified = (try? url.resourceValues(forKeys: Set(keys)))?
+                .contentModificationDate ?? .distantPast
+
+            if let index = notes.firstIndex(where: { $0.fileURL == url }) {
+                guard modified > notes[index].modified,
+                      let text = try? String(contentsOf: url, encoding: .utf8),
+                      text != notes[index].text
+                else { continue }
+                notes[index].text = text
+                notes[index].modified = modified
+                savedText[notes[index].id] = text
+                changed = true
+            } else if !known.contains(url) {
+                // A note created outside the app.
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                let note = Note(fileURL: url, text: text, modified: modified)
+                notes.append(note)
+                savedText[note.id] = text
+                changed = true
+            }
+        }
+
+        guard changed else { return }
+        sortNotes()
+        if selection == nil || !notes.contains(where: { $0.id == selection }) {
+            selection = notes.first?.id
+        }
+    }
+
     /// Writes and renames everything outstanding, right now.
     func flushPending() {
         let saving = pendingSaves.keys
@@ -292,5 +352,14 @@ final class NotesLibrary: ObservableObject {
                 }
             )
         }
+        observers.append(
+            center.addObserver(
+                forName: NSWindow.didBecomeKeyNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.syncWithDisk()
+            }
+        )
     }
 }
