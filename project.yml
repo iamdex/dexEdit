@@ -43,12 +43,33 @@ targets:
         INFOPLIST_KEY_NSSupportsSuddenTermination: NO
         COMBINE_HIDPI_IMAGES: YES
 
+  dexEditTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      # The logic under test is pure, so it is compiled straight into the test
+      # bundle. No app is launched to exercise string functions.
+      - path: Sources/Notes/Note.swift
+      - path: Sources/Editor/MarkdownScanner.swift
+      - path: Sources/Editor/MarkdownFormatter.swift
+      - path: Sources/Editor/ActiveFormats.swift
+      - path: Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEditTests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   dexEdit:
     build:
       targets:
         dexEdit: all
+        dexEditTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - dexEditTests
     archive:
       config: Release
