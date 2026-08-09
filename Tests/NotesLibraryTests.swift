@@ -232,6 +232,159 @@ final class NotesLibraryTests: XCTestCase {
         )
     }
 
+    // MARK: - Folders
+
+    private func makeSubfolder(_ name: String) throws -> URL {
+        let url = folder.appending(path: name)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func testNotesInSubfoldersAreLoaded() throws {
+        try write("# Top", to: "top.md")
+        let projects = try makeSubfolder("Projects")
+        try "# Nested".write(to: projects.appending(path: "nested.md"), atomically: true, encoding: .utf8)
+
+        library.setFolder(folder)
+
+        XCTAssertEqual(Set(library.notes.map(\.summary.title)), ["Top", "Nested"])
+    }
+
+    func testFolderLabelIsOnlySetForNotesBelowTheTopLevel() throws {
+        try write("# Top", to: "top.md")
+        let projects = try makeSubfolder("Projects")
+        try "# Nested".write(to: projects.appending(path: "nested.md"), atomically: true, encoding: .utf8)
+        library.setFolder(folder)
+
+        let top = try XCTUnwrap(library.notes.first { $0.summary.title == "Top" })
+        let nested = try XCTUnwrap(library.notes.first { $0.summary.title == "Nested" })
+
+        XCTAssertNil(library.folderLabel(for: top))
+        XCTAssertEqual(library.folderLabel(for: nested), "Projects")
+    }
+
+    func testNestedFolderLabelReadsAsAPath() throws {
+        let deep = try makeSubfolder("Work/Clients")
+        try "# Deep".write(to: deep.appending(path: "deep.md"), atomically: true, encoding: .utf8)
+        library.setFolder(folder)
+
+        let note = try XCTUnwrap(library.notes.first)
+        XCTAssertEqual(library.folderLabel(for: note), "Work/Clients")
+    }
+
+    func testMovingANoteRelocatesTheFileAndKeepsTheNote() throws {
+        try write("# Movable\nbody", to: "movable.md")
+        let archive = try makeSubfolder("Archive")
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.selection)
+
+        library.move(id, to: archive)
+
+        XCTAssertEqual(filenames, [], "nothing left at the top level")
+        XCTAssertEqual(
+            try String(contentsOf: archive.appending(path: "movable.md"), encoding: .utf8),
+            "# Movable\nbody"
+        )
+        XCTAssertEqual(library.selection, id, "the note itself is untouched")
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Archive")
+    }
+
+    func testMovingCommitsAPendingEditFirst() throws {
+        try write("# Movable\nbody", to: "movable.md")
+        let archive = try makeSubfolder("Archive")
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.selection)
+
+        library.updateText("# Movable\nedited", for: id)
+        library.move(id, to: archive)
+
+        XCTAssertEqual(
+            try String(contentsOf: archive.appending(path: "movable.md"), encoding: .utf8),
+            "# Movable\nedited"
+        )
+    }
+
+    func testMovingIntoAFolderThatAlreadyHasThatFilenameGetsASuffix() throws {
+        try write("# Notes", to: "notes.md")
+        let archive = try makeSubfolder("Archive")
+        try "# Older notes".write(
+            to: archive.appending(path: "notes.md"), atomically: true, encoding: .utf8
+        )
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.notes.first { $0.summary.title == "Notes" }?.id)
+
+        library.move(id, to: archive)
+
+        XCTAssertEqual(
+            library.note(id)?.fileURL?.lastPathComponent, "notes-2.md",
+            "the existing file in the target folder is not overwritten"
+        )
+    }
+
+    func testRenamingKeepsANoteInItsOwnFolder() throws {
+        let archive = try makeSubfolder("Archive")
+        try "# Old\nbody".write(
+            to: archive.appending(path: "old.md"), atomically: true, encoding: .utf8
+        )
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.selection)
+
+        library.updateText("# Renamed\nbody", for: id)
+        library.flushPending()
+
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Archive")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: archive.appending(path: "renamed.md").path)
+        )
+        XCTAssertEqual(filenames, [], "the rename did not escape to the top level")
+    }
+
+    func testNewNotesAreBornAtTheTopLevel() throws {
+        _ = try makeSubfolder("Archive")
+        library.setFolder(folder)
+        library.newNote()
+        let id = try XCTUnwrap(library.selection)
+
+        library.updateText("# Fresh", for: id)
+        library.flushPending()
+
+        XCTAssertNil(library.folderLabel(for: try XCTUnwrap(library.note(id))))
+    }
+
+    func testCreateFolderRejectsPathSeparators() throws {
+        library.setFolder(folder)
+
+        let created = try XCTUnwrap(library.createFolder(named: "Work/Secret"))
+
+        XCTAssertEqual(created.lastPathComponent, "Work-Secret", "a name is one folder, not a path")
+        // Compared as paths: deletingLastPathComponent leaves a trailing slash.
+        XCTAssertEqual(created.deletingLastPathComponent().path, folder.path)
+    }
+
+    func testCreateFolderRefusesEmptyAndHiddenNames() {
+        library.setFolder(folder)
+
+        XCTAssertNil(library.createFolder(named: "   "))
+        XCTAssertNil(library.createFolder(named: ".hidden"))
+    }
+
+    func testSyncFollowsANoteMovedBetweenFoldersOutsideTheApp() throws {
+        try write("# Wanderer\nbody", to: "wanderer.md")
+        let archive = try makeSubfolder("Archive")
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.selection)
+
+        try FileManager.default.moveItem(
+            at: folder.appending(path: "wanderer.md"),
+            to: archive.appending(path: "wanderer.md")
+        )
+        library.syncWithDisk()
+
+        XCTAssertEqual(library.notes.count, 1, "not treated as a delete plus an add")
+        XCTAssertEqual(library.selection, id, "the selection survives the move")
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Archive")
+    }
+
     // MARK: - Search
 
     func testSearchMatchesTitleAndBody() throws {

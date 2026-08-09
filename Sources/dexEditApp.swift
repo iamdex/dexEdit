@@ -106,6 +106,10 @@ struct dexEditApp: App {
 
                 Divider()
 
+                MoveToFolderMenu(library: library)
+
+                Divider()
+
                 Button("Delete Note…") {
                     library.requestDeleteSelected()
                 }

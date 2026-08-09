@@ -57,7 +57,7 @@ struct NoteListView: View {
     private var list: some View {
         List(selection: $library.selection) {
             ForEach(library.filteredNotes) { note in
-                NoteRow(summary: note.summary)
+                NoteRow(summary: note.summary, folder: library.folderLabel(for: note))
                     .tag(note.id)
             }
         }
@@ -94,15 +94,27 @@ private extension NoteListView {
 
 private struct NoteRow: View {
     let summary: Note.Summary
+    /// Only set for notes that live in a subfolder; most rows show no badge.
+    let folder: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(summary.title)
                 .lineLimit(1)
-            Text(summary.preview.isEmpty ? "No additional text" : summary.preview)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            HStack(spacing: 5) {
+                if let folder {
+                    Label(folder, systemImage: "folder")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                }
+                Text(summary.preview.isEmpty ? "No additional text" : summary.preview)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .padding(.vertical, 2)
     }
