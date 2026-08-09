@@ -26,6 +26,14 @@ struct dexEditApp: App {
         }
         .defaultSize(width: 1000, height: 700)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                OpenWindowButton(title: "About dexEdit", id: "about")
+            }
+            CommandGroup(replacing: .help) {
+                OpenWindowButton(title: "dexEdit Help", id: "help")
+                    .keyboardShortcut("?", modifiers: .command)
+            }
+
             CommandGroup(replacing: .newItem) {
                 Button("New Note") {
                     // The new editor is created after this state change, and
@@ -105,5 +113,29 @@ struct dexEditApp: App {
                 .disabled(library.selection == nil)
             }
         }
+
+        Window("About dexEdit", id: "about") {
+            AboutView()
+                .environmentObject(folderStore)
+        }
+        .windowResizability(.contentSize)
+
+        Window("dexEdit Help", id: "help") {
+            HelpView()
+        }
+        .windowResizability(.contentSize)
+    }
+}
+
+/// Menu commands live at App scope, which has no environment of its own; a
+/// one-line view does, and that is where openWindow can be reached.
+private struct OpenWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    let title: String
+    let id: String
+
+    var body: some View {
+        Button(title) { openWindow(id: id) }
     }
 }
