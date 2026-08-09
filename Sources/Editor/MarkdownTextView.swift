@@ -77,8 +77,12 @@ struct MarkdownTextView: NSViewRepresentable {
         // The menu bar reaches the editor through here.
         bridge.textView = textView
 
-        DispatchQueue.main.async {
-            textView.window?.makeFirstResponder(textView)
+        if bridge.wantsEditorFocus {
+            bridge.wantsEditorFocus = false
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+                LaunchTimer.editorReady()
+            }
         }
 
         return scrollView

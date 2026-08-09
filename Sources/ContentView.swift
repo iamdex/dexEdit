@@ -13,6 +13,7 @@ struct ContentView: View {
                 } detail: {
                     EditorPane()
                 }
+                .navigationTitle(library.note(library.selection)?.summary.title ?? "dexEdit")
             } else {
                 FolderPickerPrompt()
             }
@@ -62,10 +63,16 @@ private struct EditorPane: View {
                 // reaches back into the note you just left.
                 .id(id)
             } else {
-                Text("No note selected")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: .textBackgroundColor))
+                VStack(spacing: 6) {
+                    Text("No note selected")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                    Text("Press ⌘N to start one.")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .textBackgroundColor))
             }
         }
         .overlay(alignment: .bottom) {

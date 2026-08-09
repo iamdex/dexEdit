@@ -65,9 +65,29 @@ struct NoteListView: View {
         .focused($focus, equals: .list)
         .overlay {
             if library.filteredNotes.isEmpty {
-                Text(library.searchText.isEmpty ? "No notes yet" : "No matches")
-                    .foregroundStyle(.secondary)
+                emptyState
             }
+        }
+    }
+}
+
+private extension NoteListView {
+    @ViewBuilder
+    var emptyState: some View {
+        if library.searchText.isEmpty {
+            VStack(spacing: 10) {
+                Text("No notes yet")
+                    .foregroundStyle(.secondary)
+                Button("New Note") {
+                    bridge.wantsEditorFocus = true
+                    library.newNote()
+                }
+            }
+            .padding()
+        } else {
+            Text("No matches")
+                .foregroundStyle(.secondary)
+                .padding()
         }
     }
 }

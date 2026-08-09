@@ -24,7 +24,10 @@ final class EditorBridge: ObservableObject {
 
     @Published var focusRequest: FocusRequest?
 
-    var hasEditor: Bool { textView != nil }
+    /// Set when the user has asked for an editor they mean to type in — at
+    /// launch, and on Cmd+N. A new editor takes focus only then, so arrowing
+    /// through the sidebar doesn't get hijacked by each note it lands on.
+    var wantsEditorFocus = true
 
     // MARK: - Formatting
 

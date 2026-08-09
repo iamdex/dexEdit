@@ -8,6 +8,7 @@ struct dexEditApp: App {
     @AppStorage("editorMode") private var mode: EditorMode = .styled
 
     init() {
+        LaunchTimer.mark("app init")
         // The window is the note; a tab bar is chrome this app has no use for.
         NSWindow.allowsAutomaticWindowTabbing = false
     }
@@ -23,6 +24,9 @@ struct dexEditApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Note") {
+                    // The new editor is created after this state change, and
+                    // consumes the flag when it appears.
+                    bridge.wantsEditorFocus = true
                     library.newNote()
                 }
                 .keyboardShortcut("n", modifiers: .command)

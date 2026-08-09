@@ -58,7 +58,9 @@ final class NotesLibrary: ObservableObject {
         errorMessage = nil
 
         guard url != nil else { return }
+        LaunchTimer.mark("folder load start")
         loadFromDisk()
+        LaunchTimer.mark("folder loaded (\(notes.count) notes)")
         selection = notes.first?.id
     }
 
