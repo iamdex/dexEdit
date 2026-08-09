@@ -37,27 +37,17 @@ struct EditorToolbar: View {
         }
 
         FormatToggle(symbol: "link", help: "Link", isOn: active.link) { bridge.insertLink() }
+        // Inserting an image is an action, not a state to be in, so it is a
+        // plain button rather than a toggle that could never look pressed.
+        FormatButton(symbol: "photo", help: "Image") { bridge.insertImage() }
 
-        overflowMenu
-    }
-
-    /// An explicit overflow, rather than trusting the toolbar to fold items away
-    /// on its own — past a certain width it draws them but stops hit-testing them.
-    private var overflowMenu: some View {
-        Menu {
-            // Inserting an image is an action, not a state to be in.
-            Button("Insert Image") { bridge.insertImage() }
-            Divider()
-            Toggle("Raw Markdown", isOn: Binding(
-                get: { mode == .raw },
-                set: { _ in mode.toggle() }
-            ))
-        } label: {
-            Label("More", systemImage: "ellipsis.circle")
+        FormatToggle(
+            symbol: "curlybraces",
+            help: mode == .styled ? "Show Raw Markdown" : "Show Styled Markdown",
+            isOn: mode == .raw
+        ) {
+            mode.toggle()
         }
-        .menuStyle(.borderlessButton)
-        .disabled(!isEnabled)
-        .help("More formatting")
     }
 
     private var headingMenu: some View {
