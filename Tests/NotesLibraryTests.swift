@@ -180,6 +180,119 @@ final class NotesLibraryTests: XCTestCase {
         XCTAssertNotNil(library.selection, "selection moves to what's left")
     }
 
+    // MARK: - Renaming, moving and deleting folders
+
+    func testRenamingAFolderCarriesItsNotesWithIt() throws {
+        let work = try makeSubfolder("Work")
+        try "# Inside".write(to: work.appending(path: "inside.md"), atomically: true, encoding: .utf8)
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.notes.first?.id)
+
+        library.renameFolder(work, to: "Business")
+
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Business")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: folder.appending(path: "Business/inside.md").path)
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: work.path))
+    }
+
+    func testRenamingAFolderUpdatesDeeplyNestedNotesToo() throws {
+        let deep = try makeSubfolder("Work/Clients/Acme")
+        try "# Brief".write(to: deep.appending(path: "brief.md"), atomically: true, encoding: .utf8)
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.notes.first?.id)
+
+        library.renameFolder(folder.appending(path: "Work"), to: "Business")
+
+        XCTAssertEqual(
+            library.folderLabel(for: try XCTUnwrap(library.note(id))), "Business/Clients/Acme"
+        )
+    }
+
+    func testRenamingOntoAnExistingNameIsRefused() throws {
+        let work = try makeSubfolder("Work")
+        _ = try makeSubfolder("Archive")
+        library.setFolder(folder)
+
+        let result = library.renameFolder(work, to: "Archive")
+
+        XCTAssertNil(result, "merging two folders silently would be the wrong answer")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: work.path))
+    }
+
+    func testMovingAFolderIntoAnotherOne() throws {
+        let work = try makeSubfolder("Work")
+        let archive = try makeSubfolder("Archive")
+        try "# Inside".write(to: work.appending(path: "inside.md"), atomically: true, encoding: .utf8)
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.notes.first?.id)
+
+        library.moveFolder(work, into: archive)
+
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Archive/Work")
+    }
+
+    func testAFolderCannotBeMovedInsideItself() throws {
+        let work = try makeSubfolder("Work")
+        let clients = try makeSubfolder("Work/Clients")
+        library.setFolder(folder)
+
+        XCTAssertNil(library.moveFolder(work, into: clients), "that would delete the tree")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: clients.path))
+    }
+
+    func testTheNotesFolderItselfCannotBeMoved() throws {
+        let archive = try makeSubfolder("Archive")
+        library.setFolder(folder)
+
+        XCTAssertNil(library.moveFolder(folder, into: archive))
+    }
+
+    func testDeletingAFolderTakesItsNotesWithIt() throws {
+        let work = try makeSubfolder("Work/Clients")
+        try "# Doomed".write(to: work.appending(path: "doomed.md"), atomically: true, encoding: .utf8)
+        try write("# Survivor", to: "survivor.md")
+        library.setFolder(folder)
+
+        library.deleteFolder(folder.appending(path: "Work"))
+
+        XCTAssertEqual(library.notes.map(\.summary.title), ["Survivor"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appending(path: "Work").path))
+        XCTAssertNotNil(library.selection, "selection moves to what's left")
+    }
+
+    func testNoteCountReportsWhatADeleteWouldTake() throws {
+        let deep = try makeSubfolder("Work/Clients")
+        try "# One".write(to: deep.appending(path: "one.md"), atomically: true, encoding: .utf8)
+        try "# Two".write(
+            to: folder.appending(path: "Work/two.md"), atomically: true, encoding: .utf8
+        )
+        try write("# Outside", to: "outside.md")
+        library.setFolder(folder)
+
+        XCTAssertEqual(library.noteCount(in: folder.appending(path: "Work")), 2)
+    }
+
+    func testRenamingCommitsPendingEditsFirst() throws {
+        let work = try makeSubfolder("Work")
+        try "# Inside\nbody".write(
+            to: work.appending(path: "inside.md"), atomically: true, encoding: .utf8
+        )
+        library.setFolder(folder)
+        let id = try XCTUnwrap(library.notes.first?.id)
+
+        library.updateText("# Inside\nedited", for: id)
+        library.renameFolder(work, to: "Business")
+
+        XCTAssertEqual(
+            try String(
+                contentsOf: folder.appending(path: "Business/inside.md"), encoding: .utf8
+            ),
+            "# Inside\nedited"
+        )
+    }
+
     // MARK: - External changes
 
     func testSyncPicksUpAFileCreatedElsewhere() throws {

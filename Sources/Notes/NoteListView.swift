@@ -162,19 +162,18 @@ private struct FolderRows: View {
                 DisclosureGroup(isExpanded: isExpanded(node.id)) {
                     FolderRows(nodes: node.children, expanded: $expanded)
                 } label: {
-                    Label(node.name, systemImage: "folder")
-                        .contextMenu {
-                            FolderActions(
-                                folder: url,
-                                reveal: { expanded.insert(node.id) }
-                            )
-                        }
+                    FolderLabel(
+                        name: node.name,
+                        folder: url,
+                        reveal: { expanded.insert(node.id) }
+                    )
                 }
 
             case .note(let id):
                 if let note = library.note(id) {
                     NoteRow(summary: note.summary, folder: nil)
                         .tag(id)
+                        .draggable(SidebarDrop.note(id))
                 }
             }
         }
@@ -187,6 +186,47 @@ private struct FolderRows: View {
                 if isOpen { expanded.insert(id) } else { expanded.remove(id) }
             }
         )
+    }
+}
+
+/// A folder row: the drop target, and the thing you can drag onto another one.
+private struct FolderLabel: View {
+    @EnvironmentObject private var library: NotesLibrary
+
+    let name: String
+    let folder: URL
+    let reveal: () -> Void
+
+    @State private var isTargeted = false
+
+    var body: some View {
+        Label(name, systemImage: "folder")
+            .padding(.vertical, 1)
+            .padding(.horizontal, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isTargeted ? Color.accentColor.opacity(0.25) : .clear)
+            )
+            .contextMenu { FolderActions(folder: folder, reveal: reveal) }
+            .draggable(SidebarDrop.folder(folder))
+            .dropDestination(for: SidebarDrop.self) { items, _ in
+                reveal()
+                return accept(items)
+            } isTargeted: { isTargeted = $0 }
+    }
+
+    private func accept(_ items: [SidebarDrop]) -> Bool {
+        var moved = false
+        for item in items {
+            switch item {
+            case .note(let id):
+                library.move(id, to: folder)
+                moved = true
+            case .folder(let url):
+                moved = library.moveFolder(url, into: folder) != nil || moved
+            }
+        }
+        return moved
     }
 }
 
@@ -209,6 +249,16 @@ private struct FolderActions: View {
             guard let name = FolderNamePrompt.run(inside: folder.lastPathComponent) else { return }
             reveal()
             library.createFolder(named: name, in: folder)
+        }
+
+        Divider()
+
+        Button("Rename…") {
+            guard let name = FolderNamePrompt.rename(folder.lastPathComponent) else { return }
+            library.renameFolder(folder, to: name)
+        }
+        Button("Move to Trash") {
+            library.folderDeletionRequest = folder
         }
     }
 }

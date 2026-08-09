@@ -32,6 +32,10 @@ final class NotesLibrary: ObservableObject {
     /// The note the user has asked to delete, pending confirmation.
     @Published var deletionRequest: Note.ID?
 
+    /// The folder the user has asked to delete, pending confirmation. Deleting
+    /// a folder takes its notes with it, so it always asks.
+    @Published var folderDeletionRequest: URL?
+
     private(set) var folderURL: URL?
 
     /// When the folder was last read. Every window becoming key asks for a
@@ -172,13 +176,7 @@ final class NotesLibrary: ObservableObject {
         guard let folderURL else { return nil }
         let parent = parent ?? folderURL
 
-        // A name is a single folder, never a path — slashes and colons would
-        // otherwise smuggle in a hierarchy or break the filesystem.
-        let cleaned = name
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-        guard !cleaned.isEmpty, !cleaned.hasPrefix(".") else { return nil }
+        guard let cleaned = sanitizedFolderName(name) else { return nil }
 
         let target = parent.appending(path: cleaned)
         do {
@@ -189,6 +187,134 @@ final class NotesLibrary: ObservableObject {
             errorMessage = "Couldn’t create the folder: \(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// How many notes a folder holds, its subfolders included. The confirmation
+    /// before deleting a folder has to say what it is about to take with it.
+    func noteCount(in folder: URL) -> Int {
+        let prefix = folder.standardizedFileURL.path + "/"
+        return notes.count { ($0.fileURL?.standardizedFileURL.path ?? "").hasPrefix(prefix) }
+    }
+
+    /// Renames a folder in place. Everything inside it moves with it.
+    @discardableResult
+    func renameFolder(_ folder: URL, to newName: String) -> URL? {
+        guard let cleaned = sanitizedFolderName(newName) else { return nil }
+        let destination = folder.deletingLastPathComponent().appending(path: cleaned)
+        return relocateFolder(folder, to: destination)
+    }
+
+    /// Moves a folder inside another one.
+    @discardableResult
+    func moveFolder(_ folder: URL, into parent: URL) -> URL? {
+        relocateFolder(folder, to: parent.appending(path: folder.lastPathComponent))
+    }
+
+    /// Moves a folder and everything under it to the Trash.
+    func deleteFolder(_ folder: URL) {
+        guard let folderURL,
+              folder.standardizedFileURL != folderURL.standardizedFileURL
+        else { return }
+
+        flushPending()
+
+        do {
+            try FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+        } catch {
+            errorMessage = "Couldn’t delete \(folder.lastPathComponent): \(error.localizedDescription)"
+            return
+        }
+
+        let prefix = folder.standardizedFileURL.path + "/"
+        let doomed = notes.filter {
+            ($0.fileURL?.standardizedFileURL.path ?? "").hasPrefix(prefix)
+        }
+        for note in doomed {
+            savedText.removeValue(forKey: note.id)
+            destinations.removeValue(forKey: note.id)
+            pendingSaves.removeValue(forKey: note.id)?.cancel()
+            pendingRenames.removeValue(forKey: note.id)?.cancel()
+        }
+        let doomedIDs = Set(doomed.map(\.id))
+        notes.removeAll { doomedIDs.contains($0.id) }
+
+        folders = scanFolders()
+        if selection == nil || !notes.contains(where: { $0.id == selection }) {
+            selection = notes.first?.id
+        }
+    }
+
+    /// The one move that rename and drag-and-drop both go through, so the
+    /// guards are written once.
+    @discardableResult
+    private func relocateFolder(_ source: URL, to destination: URL) -> URL? {
+        guard let folderURL else { return nil }
+
+        let from = source.standardizedFileURL
+        let to = destination.standardizedFileURL
+
+        guard from != folderURL.standardizedFileURL else {
+            errorMessage = "The notes folder itself can’t be moved."
+            return nil
+        }
+        guard from != to else { return from }
+        // A folder cannot be filed inside itself, however you drag it.
+        guard !isDescendant(to, of: from) else {
+            errorMessage = "A folder can’t be moved inside itself."
+            return nil
+        }
+        guard !FileManager.default.fileExists(atPath: to.path) else {
+            errorMessage = "There’s already something called “\(to.lastPathComponent)” there."
+            return nil
+        }
+
+        flushPending()
+
+        do {
+            try FileManager.default.moveItem(at: from, to: to)
+        } catch {
+            errorMessage = "Couldn’t move \(from.lastPathComponent): \(error.localizedDescription)"
+            return nil
+        }
+
+        // Every note underneath now lives somewhere else.
+        let prefix = from.path + "/"
+        for index in notes.indices {
+            guard let path = notes[index].fileURL?.standardizedFileURL.path,
+                  path.hasPrefix(prefix)
+            else { continue }
+            notes[index].fileURL = to.appending(path: String(path.dropFirst(prefix.count)))
+        }
+        // Including the ones still waiting to be written for the first time.
+        for (id, directory) in destinations {
+            let path = directory.standardizedFileURL.path
+            if path == from.path {
+                destinations[id] = to
+            } else if path.hasPrefix(prefix) {
+                destinations[id] = to.appending(path: String(path.dropFirst(prefix.count)))
+            }
+        }
+
+        folders = scanFolders()
+        errorMessage = nil
+        return to
+    }
+
+    /// A name is a single folder, never a path — slashes and colons would
+    /// otherwise smuggle in a hierarchy or break the filesystem.
+    private func sanitizedFolderName(_ name: String) -> String? {
+        let cleaned = name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        guard !cleaned.isEmpty, !cleaned.hasPrefix(".") else { return nil }
+        return cleaned
+    }
+
+    private func isDescendant(_ url: URL, of ancestor: URL) -> Bool {
+        let ancestorPath = ancestor.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        return path == ancestorPath || path.hasPrefix(ancestorPath + "/")
     }
 
     /// Moves a note's file into `directory`, keeping the note itself — and the
