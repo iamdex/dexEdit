@@ -2,15 +2,16 @@ import AppKit
 import SwiftUI
 
 /// The editor: an `NSTextView` inside an `NSScrollView`, built by hand so the
-/// text storage stays reachable for the live styling layer in M4.
+/// text storage stays reachable for the live styling layer.
 ///
-/// The buffer holds markdown plain text and nothing else. Nothing here converts
-/// between formats — there is only one format.
+/// The buffer holds markdown plain text and nothing else. "Styled" and "raw" are
+/// two renderings of the same characters — nothing here converts between formats.
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    var mode: EditorMode
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, mode: mode)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -64,13 +65,12 @@ struct MarkdownTextView: NSViewRepresentable {
             width: EditorTheme.minHorizontalInset,
             height: EditorTheme.verticalInset
         )
-        textView.font = EditorTheme.bodyFont
-        textView.typingAttributes = EditorTheme.baseAttributes
+        textView.typingAttributes = EditorTheme.baseAttributes(for: mode)
         textView.delegate = context.coordinator
+        textStorage.delegate = context.coordinator
 
         scrollView.documentView = textView
         context.coordinator.textView = textView
-
         context.coordinator.replaceText(with: text)
 
         DispatchQueue.main.async {
@@ -81,38 +81,82 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        if context.coordinator.mode != mode {
+            context.coordinator.mode = mode
+            context.coordinator.restyleEverything()
+        }
+
         // Only ever driven by an external change (note switch, reload from disk).
         // Typing round-trips through the coordinator, which leaves these equal.
         guard context.coordinator.textView?.string != text else { return }
         context.coordinator.replaceText(with: text)
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         @Binding private var text: String
+        var mode: EditorMode
         weak var textView: NSTextView?
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, mode: EditorMode) {
             _text = text
+            self.mode = mode
         }
 
-        /// Replaces the whole buffer and restores the base attributes, which
-        /// setting `string` throws away.
+        /// Replaces the whole buffer. Styling follows from the storage delegate,
+        /// which sees this as one large edit.
         func replaceText(with newText: String) {
             guard let textView else { return }
             let previousSelection = textView.selectedRange()
             textView.string = newText
+            textView.typingAttributes = EditorTheme.baseAttributes(for: mode)
 
-            let full = NSRange(location: 0, length: (newText as NSString).length)
-            textView.textStorage?.setAttributes(EditorTheme.baseAttributes, range: full)
-            textView.typingAttributes = EditorTheme.baseAttributes
-
-            let location = min(previousSelection.location, full.length)
+            let location = min(previousSelection.location, (newText as NSString).length)
             textView.setSelectedRange(NSRange(location: location, length: 0))
         }
+
+        func restyleEverything() {
+            guard let storage = textView?.textStorage else { return }
+            MarkdownStyler.apply(
+                to: storage,
+                range: NSRange(location: 0, length: storage.length),
+                mode: mode
+            )
+            textView?.typingAttributes = EditorTheme.baseAttributes(for: mode)
+        }
+
+        // MARK: - NSTextViewDelegate
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+        }
+
+        // MARK: - NSTextStorageDelegate
+
+        func textStorage(
+            _ textStorage: NSTextStorage,
+            didProcessEditing editedMask: NSTextStorageEditActions,
+            range editedRange: NSRange,
+            changeInLength delta: Int
+        ) {
+            // Attribute-only edits are our own work coming back around.
+            guard editedMask.contains(.editedCharacters) else { return }
+
+            let text = textStorage.string as NSString
+            let paragraph = text.paragraphRange(for: editedRange)
+
+            // A fence delimiter changes what every line below it means, so that
+            // one edit — and only that one — pays for a full restyle.
+            if MarkdownStyler.affectsFences(text, range: paragraph) {
+                MarkdownStyler.apply(
+                    to: textStorage,
+                    range: NSRange(location: 0, length: text.length),
+                    mode: mode
+                )
+                return
+            }
+
+            MarkdownStyler.apply(to: textStorage, range: paragraph, mode: mode)
         }
     }
 }

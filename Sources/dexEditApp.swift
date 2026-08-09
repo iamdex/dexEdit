@@ -4,6 +4,7 @@ import SwiftUI
 struct dexEditApp: App {
     @StateObject private var folderStore = NotesFolderStore()
     @StateObject private var library = NotesLibrary()
+    @AppStorage("editorMode") private var mode: EditorMode = .styled
 
     init() {
         // The window is the note; a tab bar is chrome this app has no use for.
@@ -33,6 +34,13 @@ struct dexEditApp: App {
                 // Deliberately empty: there is no save command in this app.
             }
             CommandMenu("Note") {
+                Button(mode == .styled ? "Show Raw Markdown" : "Show Styled Markdown") {
+                    mode.toggle()
+                }
+                .keyboardShortcut("/", modifiers: .command)
+
+                Divider()
+
                 Button("Delete Note…") {
                     library.requestDeleteSelected()
                 }

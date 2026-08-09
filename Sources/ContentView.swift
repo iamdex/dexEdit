@@ -44,6 +44,7 @@ struct ContentView: View {
 
 private struct EditorPane: View {
     @EnvironmentObject private var library: NotesLibrary
+    @AppStorage("editorMode") private var mode: EditorMode = .styled
 
     var body: some View {
         Group {
@@ -52,7 +53,8 @@ private struct EditorPane: View {
                     text: Binding(
                         get: { library.text(for: id) },
                         set: { library.updateText($0, for: id) }
-                    )
+                    ),
+                    mode: mode
                 )
                 // A fresh text view per note: focus lands in it, and undo never
                 // reaches back into the note you just left.

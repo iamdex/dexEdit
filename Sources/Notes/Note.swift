@@ -40,8 +40,10 @@ struct Note: Identifiable, Equatable {
         let titleIndex = headingIndex ?? 0
         let title = headingIndex.flatMap { Self.headingText(of: lines[$0]) } ?? lines[0]
 
-        // The preview is the first line that isn't the one used as the title.
-        let preview = lines.enumerated().first { $0.offset != titleIndex }?.element ?? ""
+        // The preview is the first line that isn't the one used as the title,
+        // with its own heading markers stripped so the sidebar stays readable.
+        let previewLine = lines.enumerated().first { $0.offset != titleIndex }?.element ?? ""
+        let preview = Self.headingText(of: previewLine) ?? previewLine
 
         return Summary(
             title: String(title.prefix(120)),
