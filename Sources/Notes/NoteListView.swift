@@ -1,10 +1,24 @@
 import MarkdownCore
 import SwiftUI
 
-/// The sidebar: every note, newest first, filtered by the search field.
+/// How the sidebar lists notes.
+enum SidebarMode: String, CaseIterable {
+    /// Flat, newest first. What the app was built around: you come back to what
+    /// you were just doing.
+    case recent
+    /// The folder tree, for a vault someone deliberately organised.
+    case folders
+}
+
+/// The sidebar: either the recent list or the folder tree, filtered by the
+/// search field. A search always flattens to results — the query beats the
+/// structure, as it does in Obsidian.
 struct NoteListView: View {
     @EnvironmentObject private var library: NotesLibrary
     @EnvironmentObject private var bridge: EditorBridge
+
+    @AppStorage("sidebarMode") private var mode: SidebarMode = .recent
+    @AppStorage("expandedFolders") private var expandedPaths = ""
 
     private enum Field: Hashable {
         case search
@@ -13,6 +27,10 @@ struct NoteListView: View {
 
     @FocusState private var focus: Field?
 
+    private var isSearching: Bool {
+        !library.searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
         list
             // An inset rather than a VStack, so the list's scroll content stops
@@ -20,6 +38,7 @@ struct NoteListView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     searchField
+                    modePicker
                     Divider()
                 }
                 .background(.bar)
@@ -55,27 +74,66 @@ struct NoteListView: View {
         .padding(.vertical, 8)
     }
 
+    private var modePicker: some View {
+        Picker("", selection: $mode) {
+            Text("Recent").tag(SidebarMode.recent)
+            Text("Folders").tag(SidebarMode.folders)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, 10)
+        .padding(.bottom, 8)
+        .disabled(isSearching)
+        .help(isSearching ? "Search shows every match, wherever it lives" : "")
+    }
+
+    @ViewBuilder
     private var list: some View {
         List(selection: $library.selection) {
-            ForEach(library.filteredNotes) { note in
-                NoteRow(summary: note.summary, folder: library.folderLabel(for: note))
-                    .tag(note.id)
+            if mode == .folders && !isSearching {
+                FolderRows(
+                    nodes: library.sidebarTree,
+                    expanded: expandedBinding
+                )
+            } else {
+                // Whenever the list is flat the badge is the only thing saying
+                // where a note lives — including search results reached from
+                // the folder view.
+                ForEach(library.filteredNotes) { note in
+                    NoteRow(summary: note.summary, folder: library.folderLabel(for: note))
+                        .tag(note.id)
+                }
             }
         }
         .listStyle(.sidebar)
         .focused($focus, equals: .list)
         .overlay {
-            if library.filteredNotes.isEmpty {
+            if isEmpty {
                 emptyState
             }
         }
     }
-}
 
-private extension NoteListView {
+    private var isEmpty: Bool {
+        mode == .folders && !isSearching ? library.sidebarTree.isEmpty : library.filteredNotes.isEmpty
+    }
+
+    /// Which folders are open, remembered by path so the tree comes back the
+    /// way you left it.
+    private var expandedBinding: Binding<Set<String>> {
+        Binding(
+            get: { Set(expandedPaths.split(separator: "\n").map(String.init)) },
+            set: { expandedPaths = $0.sorted().joined(separator: "\n") }
+        )
+    }
+
     @ViewBuilder
-    var emptyState: some View {
-        if library.searchText.isEmpty {
+    private var emptyState: some View {
+        if isSearching {
+            Text("No matches")
+                .foregroundStyle(.secondary)
+                .padding()
+        } else {
             VStack(spacing: 10) {
                 Text("No notes yet")
                     .foregroundStyle(.secondary)
@@ -85,10 +143,72 @@ private extension NoteListView {
                 }
             }
             .padding()
-        } else {
-            Text("No matches")
-                .foregroundStyle(.secondary)
-                .padding()
+        }
+    }
+}
+
+/// The folder tree, drawn one level at a time.
+private struct FolderRows: View {
+    @EnvironmentObject private var library: NotesLibrary
+    @EnvironmentObject private var bridge: EditorBridge
+
+    let nodes: [SidebarNode]
+    @Binding var expanded: Set<String>
+
+    var body: some View {
+        ForEach(nodes) { node in
+            switch node.kind {
+            case .folder(let url):
+                DisclosureGroup(isExpanded: isExpanded(node.id)) {
+                    FolderRows(nodes: node.children, expanded: $expanded)
+                } label: {
+                    Label(node.name, systemImage: "folder")
+                        .contextMenu {
+                            FolderActions(
+                                folder: url,
+                                reveal: { expanded.insert(node.id) }
+                            )
+                        }
+                }
+
+            case .note(let id):
+                if let note = library.note(id) {
+                    NoteRow(summary: note.summary, folder: nil)
+                        .tag(id)
+                }
+            }
+        }
+    }
+
+    private func isExpanded(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { expanded.contains(id) },
+            set: { isOpen in
+                if isOpen { expanded.insert(id) } else { expanded.remove(id) }
+            }
+        )
+    }
+}
+
+private struct FolderActions: View {
+    @EnvironmentObject private var library: NotesLibrary
+    @EnvironmentObject private var bridge: EditorBridge
+
+    let folder: URL
+    /// Opens the folder, so whatever is created inside it is visible rather
+    /// than filed away behind a closed disclosure triangle.
+    let reveal: () -> Void
+
+    var body: some View {
+        Button("New Note Here") {
+            reveal()
+            bridge.wantsEditorFocus = true
+            library.newNote(in: folder)
+        }
+        Button("New Folder…") {
+            guard let name = FolderNamePrompt.run(inside: folder.lastPathComponent) else { return }
+            reveal()
+            library.createFolder(named: name, in: folder)
         }
     }
 }

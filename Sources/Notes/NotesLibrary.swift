@@ -15,6 +15,9 @@ final class NotesLibrary: ObservableObject {
     /// Sorted by modified date, newest first.
     @Published private(set) var notes: [Note] = []
 
+    /// Every folder under the notes folder, empty ones included.
+    @Published private(set) var folders: [URL] = []
+
     @Published var selection: Note.ID? {
         didSet {
             guard oldValue != selection else { return }
@@ -40,6 +43,10 @@ final class NotesLibrary: ObservableObject {
     /// What is currently on disk for each note, so an untouched note is never
     /// rewritten.
     private var savedText: [Note.ID: String] = [:]
+
+    /// Where a note that has never been written is destined to go. A new note
+    /// has no file, but the folder view still has to draw it somewhere.
+    private var destinations: [Note.ID: URL] = [:]
     private var pendingSaves: [Note.ID: DispatchWorkItem] = [:]
     private var pendingRenames: [Note.ID: DispatchWorkItem] = [:]
     private var observers: [NSObjectProtocol] = []
@@ -83,6 +90,7 @@ final class NotesLibrary: ObservableObject {
         }
 
         notes = loaded
+        folders = scanFolders()
         sortNotes()
         lastReadFromDisk = .now
     }
@@ -112,8 +120,10 @@ final class NotesLibrary: ObservableObject {
 
     // MARK: - Folders
 
-    /// Every subfolder of the notes folder, for the Move to Folder menu.
-    var subfolders: [URL] {
+    /// Every subfolder of the notes folder, empty ones included — the folder
+    /// view has to show a folder the moment it exists, not once it has a note
+    /// in it. Read from disk, not derived from note paths.
+    private func scanFolders() -> [URL] {
         guard let folderURL else { return [] }
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
@@ -125,6 +135,21 @@ final class NotesLibrary: ObservableObject {
             .compactMap { $0 as? URL }
             .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
             .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+    }
+
+    /// The folder view's rows, folders and notes together.
+    var sidebarTree: [SidebarNode] {
+        guard let folderURL else { return [] }
+        return SidebarTree.build(
+            root: folderURL,
+            folders: folders,
+            notes: notes,
+            directoryOf: { [weak self] note in
+                note.fileURL?.deletingLastPathComponent()
+                    ?? self?.destinations[note.id]
+                    ?? folderURL
+            }
+        )
     }
 
     /// Where a note lives, relative to the notes folder. nil when it sits at the
@@ -143,8 +168,9 @@ final class NotesLibrary: ObservableObject {
     /// Creates a subfolder of the notes folder. Returns nil if the name is
     /// unusable or the folder couldn't be created.
     @discardableResult
-    func createFolder(named name: String) -> URL? {
+    func createFolder(named name: String, in parent: URL? = nil) -> URL? {
         guard let folderURL else { return nil }
+        let parent = parent ?? folderURL
 
         // A name is a single folder, never a path — slashes and colons would
         // otherwise smuggle in a hierarchy or break the filesystem.
@@ -154,9 +180,10 @@ final class NotesLibrary: ObservableObject {
             .replacingOccurrences(of: ":", with: "-")
         guard !cleaned.isEmpty, !cleaned.hasPrefix(".") else { return nil }
 
-        let target = folderURL.appending(path: cleaned)
+        let target = parent.appending(path: cleaned)
         do {
             try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            folders = scanFolders()
             return target
         } catch {
             errorMessage = "Couldn’t create the folder: \(error.localizedDescription)"
@@ -177,6 +204,7 @@ final class NotesLibrary: ObservableObject {
             // Never written: give it a home now, unless it is still empty.
             let text = notes[index].text
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            destinations[id] = directory
             let target = uniqueURL(slug: notes[index].slug, in: directory, excluding: id)
             writeNote(at: index, to: target, text: text)
             return
@@ -234,11 +262,20 @@ final class NotesLibrary: ObservableObject {
 
     /// Adds an empty note and selects it. Nothing hits disk until it has content,
     /// so a new note abandoned immediately leaves no file behind.
-    func newNote() {
-        guard folderURL != nil else { return }
+    ///
+    /// It lands beside the note you were reading, which is nearly always the
+    /// folder you meant. Pass `directory` to say otherwise.
+    func newNote(in directory: URL? = nil) {
+        guard let folderURL else { return }
+
+        let target = directory
+            ?? note(selection)?.fileURL?.deletingLastPathComponent()
+            ?? folderURL
+
         let note = Note(fileURL: nil, text: "")
         notes.insert(note, at: 0)
         savedText[note.id] = ""
+        destinations[note.id] = target
         selection = note.id
     }
 
@@ -272,6 +309,7 @@ final class NotesLibrary: ObservableObject {
 
         notes.remove(at: index)
         savedText.removeValue(forKey: id)
+        destinations.removeValue(forKey: id)
 
         if selection == id {
             selection = notes.first?.id
@@ -312,8 +350,8 @@ final class NotesLibrary: ObservableObject {
             url = existing
         } else {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            // New notes are born at the top level; moving them is a deliberate act.
-            url = uniqueURL(slug: notes[index].slug, in: folderURL, excluding: id)
+            let directory = destinations[id] ?? folderURL
+            url = uniqueURL(slug: notes[index].slug, in: directory, excluding: id)
         }
 
         writeNote(at: index, to: url, text: text)
@@ -323,6 +361,7 @@ final class NotesLibrary: ObservableObject {
         do {
             try text.write(to: url, atomically: true, encoding: .utf8)
             notes[index].fileURL = url
+            destinations.removeValue(forKey: notes[index].id)
             notes[index].modified = .now
             savedText[notes[index].id] = text
             errorMessage = nil
@@ -445,6 +484,8 @@ final class NotesLibrary: ObservableObject {
                 changed = true
             }
         }
+
+        folders = scanFolders()
 
         guard changed else { return }
         sortNotes()

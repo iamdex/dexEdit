@@ -15,7 +15,7 @@ struct MoveToFolderMenu: View {
                 }
                 .disabled(currentFolderIsRoot)
 
-                let subfolders = library.subfolders
+                let subfolders = library.folders
                 if !subfolders.isEmpty {
                     Divider()
                     ForEach(subfolders, id: \.self) { folder in
@@ -46,19 +46,9 @@ struct MoveToFolderMenu: View {
     }
 
     private func promptForNewFolder() {
-        let alert = NSAlert()
-        alert.messageText = "New Folder"
-        alert.informativeText = "Create a folder inside your notes folder and move this note into it."
-        alert.addButton(withTitle: "Create")
-        alert.addButton(withTitle: "Cancel")
-
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.placeholderString = "Folder name"
-        alert.accessoryView = field
-        alert.window.initialFirstResponder = field
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        guard let created = library.createFolder(named: field.stringValue) else { return }
+        guard let name = FolderNamePrompt.run(inside: nil),
+              let created = library.createFolder(named: name)
+        else { return }
         library.moveSelection(to: created)
     }
 }

@@ -368,6 +368,74 @@ final class NotesLibraryTests: XCTestCase {
         XCTAssertNil(library.folderLabel(for: try XCTUnwrap(library.note(id))))
     }
 
+    func testANewNoteLandsBesideTheSelectedOne() throws {
+        let work = try makeSubfolder("Work")
+        try "# Existing".write(
+            to: work.appending(path: "existing.md"), atomically: true, encoding: .utf8
+        )
+        library.setFolder(folder)
+
+        library.newNote()
+        let id = try XCTUnwrap(library.selection)
+        library.updateText("# Fresh", for: id)
+        library.flushPending()
+
+        XCTAssertEqual(
+            library.folderLabel(for: try XCTUnwrap(library.note(id))), "Work",
+            "it follows the note you were reading"
+        )
+    }
+
+    func testANewNoteCanBeAimedAtAFolderExplicitly() throws {
+        let archive = try makeSubfolder("Archive")
+        try write("# Top", to: "top.md")
+        library.setFolder(folder)
+
+        library.newNote(in: archive)
+        let id = try XCTUnwrap(library.selection)
+        library.updateText("# Filed", for: id)
+        library.flushPending()
+
+        XCTAssertEqual(library.folderLabel(for: try XCTUnwrap(library.note(id))), "Archive")
+    }
+
+    func testEmptyFoldersAreKnownToTheLibrary() throws {
+        let empty = try makeSubfolder("Empty")
+        library.setFolder(folder)
+
+        XCTAssertTrue(library.folders.map(\.path).contains(empty.path))
+    }
+
+    func testACreatedFolderAppearsImmediately() throws {
+        library.setFolder(folder)
+
+        let created = try XCTUnwrap(library.createFolder(named: "Fresh"))
+
+        XCTAssertTrue(
+            library.folders.map(\.path).contains(created.path),
+            "the folder view must show it before anything is moved into it"
+        )
+    }
+
+    func testFoldersCanBeCreatedInsideAnotherFolder() throws {
+        let work = try makeSubfolder("Work")
+        library.setFolder(folder)
+
+        let nested = try XCTUnwrap(library.createFolder(named: "Clients", in: work))
+
+        XCTAssertEqual(nested.deletingLastPathComponent().path, work.path)
+    }
+
+    func testTheTreeShowsAnUnsavedNoteWhereItIsDestined() throws {
+        let work = try makeSubfolder("Work")
+        library.setFolder(folder)
+
+        library.newNote(in: work)
+
+        let workNode = try XCTUnwrap(library.sidebarTree.first { $0.name == "Work" })
+        XCTAssertEqual(workNode.children.count, 1, "a note with no file yet still has a home")
+    }
+
     func testCreateFolderRejectsPathSeparators() throws {
         library.setFolder(folder)
 
