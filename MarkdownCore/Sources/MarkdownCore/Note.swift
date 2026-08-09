@@ -2,17 +2,17 @@ import Foundation
 
 /// One note. The markdown text is the whole truth — the title, the preview and
 /// the filename are all derived from it and never stored alongside it.
-struct Note: Identifiable, Equatable {
+public struct Note: Identifiable, Equatable {
     /// Stable for the lifetime of the process, so the list and the editor keep
     /// pointing at the same note across a rename.
-    let id: UUID
+    public let id: UUID
 
     /// nil until the note has been written to disk for the first time.
-    var fileURL: URL?
-    var text: String
-    var modified: Date
+    public var fileURL: URL?
+    public var text: String
+    public var modified: Date
 
-    init(id: UUID = UUID(), fileURL: URL?, text: String, modified: Date = .now) {
+    public init(id: UUID = UUID(), fileURL: URL?, text: String, modified: Date = .now) {
         self.id = id
         self.fileURL = fileURL
         self.text = text
@@ -20,14 +20,14 @@ struct Note: Identifiable, Equatable {
     }
 
     /// What the sidebar shows: a title and a one-line taste of the body.
-    struct Summary: Equatable {
-        var title: String
-        var preview: String
+    public struct Summary: Equatable {
+        public var title: String
+        public var preview: String
     }
 
     /// Derived on demand. Only the head of the note is scanned, so this stays
     /// cheap even when it is called once per row per redraw.
-    var summary: Summary {
+    public var summary: Summary {
         let lines = Self.headLines(of: text)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -52,7 +52,7 @@ struct Note: Identifiable, Equatable {
     }
 
     /// The filename this note wants, without the extension.
-    var slug: String { Self.slug(for: summary.title) }
+    public var slug: String { Self.slug(for: summary.title) }
 
     // MARK: - Derivation
 
@@ -79,7 +79,7 @@ struct Note: Identifiable, Equatable {
     }
 
     /// Filename-safe form of a title: lowercase, words joined by hyphens.
-    static func slug(for title: String) -> String {
+    public static func slug(for title: String) -> String {
         var out = ""
         var lastWasDash = true
 

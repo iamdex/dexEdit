@@ -1,3 +1,4 @@
+import MarkdownCore
 import XCTest
 
 /// What the formatting bar shows as active. Runs on every cursor move.

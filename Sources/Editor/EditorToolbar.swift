@@ -1,3 +1,4 @@
+import MarkdownCore
 import SwiftUI
 
 /// The formatting bar. Every button inserts or removes markdown characters —

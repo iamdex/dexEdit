@@ -21,10 +21,16 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     SWIFT_STRICT_CONCURRENCY: minimal
 
+packages:
+  MarkdownCore:
+    path: MarkdownCore
+
 targets:
   dexEdit:
     type: application
     platform: macOS
+    dependencies:
+      - package: MarkdownCore
     sources:
       - path: Sources
       # Only the catalog, so the entitlements file beside it stays out of the bundle.
@@ -46,15 +52,13 @@ targets:
   dexEditTests:
     type: bundle.unit-test
     platform: macOS
+    dependencies:
+      - package: MarkdownCore
     sources:
-      # The logic under test is pure, so it is compiled straight into the test
-      # bundle. No app is launched to exercise string functions.
-      - path: Sources/Notes/Note.swift
+      # Only the app-side file work lives here now; everything pure moved to
+      # the MarkdownCore package, which carries its own tests.
       - path: Sources/Notes/NotesLibrary.swift
       - path: Sources/LaunchTimer.swift
-      - path: Sources/Editor/MarkdownScanner.swift
-      - path: Sources/Editor/MarkdownFormatter.swift
-      - path: Sources/Editor/ActiveFormats.swift
       - path: Tests
     settings:
       base:

@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import MarkdownCore
 
 /// Lets the menu commands and the formatting bar reach the live text view, and
 /// lets them move focus between the three things that can hold it.

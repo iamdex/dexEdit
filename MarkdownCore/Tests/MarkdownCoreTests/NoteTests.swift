@@ -1,3 +1,4 @@
+import MarkdownCore
 import XCTest
 
 /// Title, preview and filename are all derived from the text and never stored,

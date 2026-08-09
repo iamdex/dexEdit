@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import MarkdownCore
 
 /// Owns every note in the folder, in memory, and keeps the folder in step.
 ///
@@ -29,6 +30,12 @@ final class NotesLibrary: ObservableObject {
     @Published var deletionRequest: Note.ID?
 
     private(set) var folderURL: URL?
+
+    /// When the folder was last read. Every window becoming key asks for a
+    /// sync — including About and Help — and the first one arrives moments
+    /// after the launch read. Re-walking the tree that often is pure waste.
+    private var lastReadFromDisk = Date.distantPast
+    private static let syncCooldown: TimeInterval = 1.0
 
     /// What is currently on disk for each note, so an untouched note is never
     /// rewritten.
@@ -77,6 +84,7 @@ final class NotesLibrary: ObservableObject {
 
         notes = loaded
         sortNotes()
+        lastReadFromDisk = .now
     }
 
     /// Every .md file under the notes folder, at any depth. Notes sitting in a
@@ -357,8 +365,22 @@ final class NotesLibrary: ObservableObject {
     /// Picks up edits made by other tools — Obsidian, a sync client, `vim`.
     /// Runs when the window becomes key, which is when the user could have been
     /// somewhere else. Real FSEvents watching is a later problem.
+    /// The throttled entry point, for the flood of didBecomeKey notifications:
+    /// every window sends one, About and Help included, and the first arrives
+    /// moments after the launch read. Asking to sync is not the same as needing
+    /// to, so the throttle lives here and not in the work itself.
+    func syncIfStale() {
+        guard Date.now.timeIntervalSince(lastReadFromDisk) > Self.syncCooldown else { return }
+        syncWithDisk()
+    }
+
     func syncWithDisk() {
         guard folderURL != nil else { return }
+        LaunchTimer.mark("sync start")
+        defer {
+            lastReadFromDisk = .now
+            LaunchTimer.mark("sync done")
+        }
 
         // Commit our own work first, so "newer on disk" means what it says.
         flushPending()
@@ -483,7 +505,7 @@ final class NotesLibrary: ObservableObject {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.syncWithDisk()
+                self?.syncIfStale()
             }
         )
     }

@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import SwiftUI
 
 /// The editor: an `NSTextView` inside an `NSScrollView`, built by hand so the
@@ -16,6 +17,7 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
+        LaunchTimer.mark("editor view build start")
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -73,6 +75,7 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.textView = textView
         context.coordinator.replaceText(with: text)
+        LaunchTimer.mark("editor text styled")
 
         // The menu bar and the formatting bar reach the editor through here.
         bridge.textView = textView

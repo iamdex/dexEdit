@@ -1,3 +1,4 @@
+import MarkdownCore
 import XCTest
 
 /// The formatting shortcuts. These are the functions behind Cmd+B, Cmd+I,

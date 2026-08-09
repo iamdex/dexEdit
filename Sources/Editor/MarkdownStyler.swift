@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 
 /// Turns scanner spans into text attributes.
 ///

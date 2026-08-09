@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import SwiftUI
 
 /// The Move to Folder submenu. Folders are a filing decision made after the

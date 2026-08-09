@@ -1,3 +1,4 @@
+import MarkdownCore
 import SwiftUI
 
 /// The sidebar: every note, newest first, filtered by the search field.

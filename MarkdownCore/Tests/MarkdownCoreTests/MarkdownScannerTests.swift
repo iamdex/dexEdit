@@ -1,3 +1,4 @@
+import MarkdownCore
 import XCTest
 
 /// The scanner behind the live styling layer. It runs on every keystroke, so

@@ -2,8 +2,8 @@ import Foundation
 
 /// A stretch of characters the styler should treat specially. Ranges are
 /// absolute document offsets in UTF-16, ready to hand to `NSTextStorage`.
-struct MarkdownSpan {
-    enum Kind: Equatable {
+public struct MarkdownSpan {
+    public enum Kind: Equatable {
         /// Syntax characters: `#`, `**`, backticks, `-`, `>`, brackets.
         case marker
         case headingText(level: Int)
@@ -18,8 +18,8 @@ struct MarkdownSpan {
         case linkURL
     }
 
-    let range: NSRange
-    let kind: Kind
+    public let range: NSRange
+    public let kind: Kind
 }
 
 /// Hand-rolled, line at a time. No AST is built and no tree is walked: the
@@ -27,11 +27,11 @@ struct MarkdownSpan {
 ///
 /// Only the constructs listed in the spec are recognised. Anything nested or
 /// exotic falls through as plain text, which is the intended behaviour.
-enum MarkdownScanner {
+public enum MarkdownScanner {
 
     /// Where the fenced code blocks are. Built once per styling pass, because a
     /// line's meaning depends on how many fences opened above it.
-    struct FenceMap {
+    public struct FenceMap {
         private let delimiters: [NSRange]
 
         private init(delimiters: [NSRange]) {
@@ -40,9 +40,9 @@ enum MarkdownScanner {
 
         /// For callers that only care about one line's inline markup and don't
         /// want to pay for a document-wide scan to find out about fences.
-        static let ignoringFences = FenceMap(delimiters: [])
+        public static let ignoringFences = FenceMap(delimiters: [])
 
-        init(text: NSString) {
+        public init(text: NSString) {
             var found: [NSRange] = []
             let length = text.length
             var searchStart = 0
@@ -62,12 +62,12 @@ enum MarkdownScanner {
             delimiters = found
         }
 
-        func isDelimiter(lineStart: Int) -> Bool {
+        public func isDelimiter(lineStart: Int) -> Bool {
             delimiters.contains { $0.location == lineStart }
         }
 
         /// A line is inside a block when an odd number of fences opened above it.
-        func isInsideFence(lineStart: Int) -> Bool {
+        public func isInsideFence(lineStart: Int) -> Bool {
             delimiters.reduce(into: 0) { count, fence in
                 if fence.location < lineStart { count += 1 }
             }.isMultiple(of: 2) == false
@@ -76,7 +76,7 @@ enum MarkdownScanner {
 
     /// Spans for a single line. `lineRange` is the full line including its
     /// newline, in document coordinates.
-    static func spans(in text: NSString, lineRange: NSRange, fences: FenceMap) -> [MarkdownSpan] {
+    public static func spans(in text: NSString, lineRange: NSRange, fences: FenceMap) -> [MarkdownSpan] {
         if fences.isDelimiter(lineStart: lineRange.location) {
             return [MarkdownSpan(range: lineRange, kind: .marker)]
         }

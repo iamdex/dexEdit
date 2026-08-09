@@ -1,3 +1,4 @@
+import MarkdownCore
 import SwiftUI
 
 struct ContentView: View {

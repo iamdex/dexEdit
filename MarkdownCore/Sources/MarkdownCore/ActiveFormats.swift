@@ -1,15 +1,17 @@
 import Foundation
 
 /// What markdown applies where the cursor is, so the formatting bar can show it.
-struct ActiveFormats: Equatable {
-    var bold = false
-    var italic = false
-    var strike = false
-    var code = false
-    var link = false
-    var bulletList = false
-    var quote = false
-    var headingLevel: Int?
+public struct ActiveFormats: Equatable {
+    public var bold = false
+    public var italic = false
+    public var strike = false
+    public var code = false
+    public var link = false
+    public var bulletList = false
+    public var quote = false
+    public var headingLevel: Int?
+
+    public init() {}
 }
 
 /// Reads the markdown around the selection.
@@ -17,9 +19,9 @@ struct ActiveFormats: Equatable {
 /// Called on every cursor move, so it scans one line and never the document —
 /// fences are deliberately ignored here, since a code block changes nothing
 /// about which button should look pressed.
-enum MarkdownContext {
+public enum MarkdownContext {
 
-    static func active(in text: NSString, selection: NSRange) -> ActiveFormats {
+    public static func active(in text: NSString, selection: NSRange) -> ActiveFormats {
         guard text.length > 0 else { return ActiveFormats() }
 
         let caret = min(selection.location, text.length)

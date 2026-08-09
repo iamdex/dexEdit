@@ -1,3 +1,4 @@
+import MarkdownCore
 import XCTest
 
 /// The file side of the app: loading a folder, autosaving, renaming a file to
@@ -189,6 +190,22 @@ final class NotesLibraryTests: XCTestCase {
         library.syncWithDisk()
 
         XCTAssertTrue(library.notes.contains { $0.summary.title == "Added Outside" })
+    }
+
+    /// Every window becoming key asks for a sync, and the first ask lands right
+    /// after the launch read. The throttle drops those without touching an
+    /// explicit sync.
+    func testSyncIfStaleSkipsAnAskThatFollowsAReadImmediately() throws {
+        try write("# First", to: "first.md")
+        library.setFolder(folder)
+
+        try write("# Added Outside", to: "added.md")
+        library.syncIfStale()
+
+        XCTAssertEqual(library.notes.count, 1, "the redundant ask was dropped")
+
+        library.syncWithDisk()
+        XCTAssertEqual(library.notes.count, 2, "an explicit sync still reads the folder")
     }
 
     func testSyncReloadsAFileChangedElsewhere() throws {

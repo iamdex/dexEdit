@@ -1,10 +1,10 @@
-import AppKit
+import Foundation
 
 /// One replacement to make in the buffer, and where the selection lands after.
-struct TextEdit: Equatable {
-    let range: NSRange
-    let replacement: String
-    let selection: NSRange
+public struct TextEdit: Equatable {
+    public let range: NSRange
+    public let replacement: String
+    public let selection: NSRange
 }
 
 /// The formatting shortcuts. Every one of them inserts or removes markdown
@@ -12,11 +12,11 @@ struct TextEdit: Equatable {
 ///
 /// These are pure functions of the text and the selection so they can be
 /// reasoned about without a text view in the room.
-enum MarkdownFormatter {
+public enum MarkdownFormatter {
 
     /// Wraps the selection in `marker`, or unwraps it if it is already wrapped.
     /// An empty selection gets an empty pair with the cursor between.
-    static func toggleWrap(in text: NSString, selection: NSRange, marker: String) -> TextEdit {
+    public static func toggleWrap(in text: NSString, selection: NSRange, marker: String) -> TextEdit {
         let markerLength = (marker as NSString).length
         let selected = text.substring(with: selection)
 
@@ -60,7 +60,7 @@ enum MarkdownFormatter {
     }
 
     /// Wraps the selection as a link with the cursor waiting inside the parens.
-    static func link(in text: NSString, selection: NSRange) -> TextEdit {
+    public static func link(in text: NSString, selection: NSRange) -> TextEdit {
         let selected = text.substring(with: selection)
         let cursor = selection.location + 1 + (selected as NSString).length + 2
         return TextEdit(
@@ -73,7 +73,7 @@ enum MarkdownFormatter {
     /// Wraps the selection as an image with the cursor waiting inside the
     /// parens. This writes markdown text and nothing else — the app does not
     /// display images, by design.
-    static func image(in text: NSString, selection: NSRange) -> TextEdit {
+    public static func image(in text: NSString, selection: NSRange) -> TextEdit {
         let selected = text.substring(with: selection)
         let cursor = selection.location + 2 + (selected as NSString).length + 2
         return TextEdit(
@@ -84,7 +84,7 @@ enum MarkdownFormatter {
     }
 
     /// Adds or removes a line prefix such as `- ` or `> `, after any indent.
-    static func toggleLinePrefix(in text: NSString, selection: NSRange, prefix: String) -> TextEdit {
+    public static func toggleLinePrefix(in text: NSString, selection: NSRange, prefix: String) -> TextEdit {
         let lineRange = text.lineRange(for: selection)
         let line = Array(text.substring(with: lineRange).utf16)
 
@@ -112,7 +112,7 @@ enum MarkdownFormatter {
 
     /// Sets the current line to a heading, or strips it if it is already that
     /// level. Any existing heading marker is replaced, not stacked.
-    static func toggleHeading(in text: NSString, selection: NSRange, level: Int) -> TextEdit {
+    public static func toggleHeading(in text: NSString, selection: NSRange, level: Int) -> TextEdit {
         let lineRange = text.lineRange(for: selection)
         let line = Array(text.substring(with: lineRange).utf16)
 
@@ -154,12 +154,5 @@ enum MarkdownFormatter {
             return true
         }
         return false
-    }
-
-    /// Applies an edit through the normal input path so undo and the styling
-    /// delegate both see it as an ordinary change.
-    static func apply(_ edit: TextEdit, to textView: NSTextView) {
-        textView.insertText(edit.replacement, replacementRange: edit.range)
-        textView.setSelectedRange(edit.selection)
     }
 }
