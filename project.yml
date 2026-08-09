@@ -1,0 +1,51 @@
+name: dexEdit
+
+options:
+  bundleIdPrefix: com.espertini
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Ad-hoc signing so `xcodebuild` works with no developer team configured.
+    # Sandbox entitlements are honoured for locally-run builds.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: YES
+    CODE_SIGNING_ALLOWED: YES
+    ENABLE_HARDENED_RUNTIME: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+targets:
+  dexEdit:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit
+        PRODUCT_NAME: dexEdit
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: Resources/dexEdit.entitlements
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        # Single-window app; no document types, no state restoration surprises.
+        INFOPLIST_KEY_NSSupportsAutomaticTermination: NO
+        INFOPLIST_KEY_NSSupportsSuddenTermination: NO
+        COMBINE_HIDPI_IMAGES: YES
+
+schemes:
+  dexEdit:
+    build:
+      targets:
+        dexEdit: all
+    run:
+      config: Debug
+    archive:
+      config: Release

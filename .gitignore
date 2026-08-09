@@ -1,0 +1,13 @@
+# XcodeGen output — generated artifact, never hand-edited
+*.xcodeproj
+*.xcworkspace
+
+# Xcode / build
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+
+# macOS
+.DS_Store
