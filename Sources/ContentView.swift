@@ -5,26 +5,38 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let url = folderStore.folderURL {
-                // Placeholder until M2 puts the editor here.
-                VStack(spacing: 8) {
-                    Text(url.lastPathComponent)
-                        .font(.title2)
-                    Text(url.path)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    Button("Choose a Different Folder…") {
-                        folderStore.chooseFolder()
-                    }
-                    .padding(.top, 8)
-                }
+            if let folder = folderStore.folderURL {
+                // M2 edits one fixed file; M3 replaces this with the note list.
+                EditorScreen(fileURL: folder.appending(path: "scratch.md"))
+                    .id(folder)
             } else {
                 FolderPickerPrompt()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+}
+
+private struct EditorScreen: View {
+    @StateObject private var note: NoteStore
+
+    init(fileURL: URL) {
+        _note = StateObject(wrappedValue: NoteStore(fileURL: fileURL))
+    }
+
+    var body: some View {
+        MarkdownTextView(text: $note.text)
+            .overlay(alignment: .bottom) {
+                if let error = note.errorMessage {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .background(.red, in: RoundedRectangle(cornerRadius: 6))
+                        .padding(12)
+                }
+            }
     }
 }
 

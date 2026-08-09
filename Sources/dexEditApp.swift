@@ -4,6 +4,11 @@ import SwiftUI
 struct dexEditApp: App {
     @StateObject private var folderStore = NotesFolderStore()
 
+    init() {
+        // The window is the note; a tab bar is chrome this app has no use for.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
