@@ -1,6 +1,11 @@
-import AppKit
 import Foundation
 import MarkdownCore
+
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Owns every note in the folder, in memory, and keeps the folder in step.
 ///
@@ -662,23 +667,42 @@ final class NotesLibrary: ObservableObject {
         return notes.contains { $0.id != id && $0.fileURL == url }
     }
 
+    /// The moments worth committing work at, and the moments worth checking
+    /// whether someone else changed the folder. Same idea on both platforms,
+    /// different names for it.
+    #if os(macOS)
+    private static let commitTriggers: [Notification.Name] = [
+        NSWindow.didResignKeyNotification,
+        NSApplication.willTerminateNotification,
+    ]
+    private static let refreshTriggers: [Notification.Name] = [
+        NSWindow.didBecomeKeyNotification
+    ]
+    #else
+    private static let commitTriggers: [Notification.Name] = [
+        UIApplication.willResignActiveNotification,
+        UIApplication.didEnterBackgroundNotification,
+    ]
+    private static let refreshTriggers: [Notification.Name] = [
+        UIApplication.didBecomeActiveNotification
+    ]
+    #endif
+
     private func observeFlushEvents() {
         let center = NotificationCenter.default
-        for name in [NSWindow.didResignKeyNotification, NSApplication.willTerminateNotification] {
+        for name in Self.commitTriggers {
             observers.append(
                 center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                     self?.flushPending()
                 }
             )
         }
-        observers.append(
-            center.addObserver(
-                forName: NSWindow.didBecomeKeyNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                self?.syncIfStale()
-            }
-        )
+        for name in Self.refreshTriggers {
+            observers.append(
+                center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    self?.syncIfStale()
+                }
+            )
+        }
     }
 }
