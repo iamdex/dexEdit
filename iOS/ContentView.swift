@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var folderStore: NotesFolderStore
     @EnvironmentObject private var library: NotesLibrary
+    @EnvironmentObject private var bridge: EditorBridge
+    @AppStorage("editorMode") private var mode: EditorMode = .styled
 
     var body: some View {
         Group {
@@ -66,6 +68,33 @@ struct ContentView: View {
                         : "“\(folder.lastPathComponent)” and the \(count) note\(count == 1 ? "" : "s") inside it."
                 )
             }
+        }
+        // With a Magic Keyboard attached — half the time, on an iPad — these
+        // are the same shortcuts as the Mac. They are declared once here rather
+        // than on the editor, so they work wherever focus happens to be.
+        .background {
+            Group {
+                Button("New Note") {
+                    bridge.wantsFocus = true
+                    library.newNote()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Button("Bold") { bridge.toggleBold() }
+                    .keyboardShortcut("b", modifiers: .command)
+                Button("Italic") { bridge.toggleItalic() }
+                    .keyboardShortcut("i", modifiers: .command)
+                Button("Link") { bridge.insertLink() }
+                    .keyboardShortcut("k", modifiers: .command)
+                Button("Toggle Raw") { mode.toggle() }
+                    .keyboardShortcut("/", modifiers: .command)
+
+                ForEach(1...6, id: \.self) { level in
+                    Button("Heading \(level)") { bridge.toggleHeading(level: level) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(level)")), modifiers: .command)
+                }
+            }
+            .hidden()
         }
     }
 }

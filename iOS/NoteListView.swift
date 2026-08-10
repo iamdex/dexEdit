@@ -21,6 +21,7 @@ struct NoteListView: View {
     @AppStorage("expandedFolders") private var expandedPaths = ""
 
     @State private var namePrompt: NoteListPrompt?
+    @State private var isShowingAbout = false
 
     private var isSearching: Bool {
         !library.searchText.trimmingCharacters(in: .whitespaces).isEmpty
@@ -31,6 +32,7 @@ struct NoteListView: View {
             .navigationTitle("Notes")
             .searchable(text: $library.searchText, prompt: "Search")
             .toolbar { toolbarContent }
+            .sheet(isPresented: $isShowingAbout) { AboutView() }
             .sheet(item: $namePrompt) { prompt in
                 switch prompt {
                 case .newFolder(let parent):
@@ -118,6 +120,14 @@ struct NoteListView: View {
                     folderStore.isPickingFolder = true
                 } label: {
                     Label("Choose Notes Folder…", systemImage: "folder")
+                }
+
+                Divider()
+
+                Button {
+                    isShowingAbout = true
+                } label: {
+                    Label("About dexEdit", systemImage: "info.circle")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
