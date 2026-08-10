@@ -134,9 +134,12 @@ private struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "number.square.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.tint)
+            // The real app icon, not a stand-in symbol.
+            Image("AppMark")
+                .resizable()
+                .frame(width: 108, height: 108)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: .black.opacity(0.16), radius: 12, y: 4)
 
             Text("dexEdit")
                 .font(.largeTitle.weight(.semibold))
@@ -161,6 +164,7 @@ private struct WelcomeView: View {
                 folderStore.isPickingFolder = true
             }
             .buttonStyle(.borderedProminent)
+            .tint(Brand.tint)
             .controlSize(.large)
             .padding(.top, 8)
         }
