@@ -6,6 +6,7 @@ import SwiftUI
 struct NoteListView: View {
     @EnvironmentObject private var library: NotesLibrary
     @EnvironmentObject private var folderStore: NotesFolderStore
+    @EnvironmentObject private var bridge: EditorBridge
 
     var body: some View {
         List(selection: $library.selection) {
@@ -27,6 +28,9 @@ struct NoteListView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    // A new note is one you mean to type in, so the editor
+                    // takes the keyboard rather than waiting to be tapped.
+                    bridge.wantsFocus = true
                     library.newNote()
                 } label: {
                     Image(systemName: "square.and.pencil")
