@@ -42,6 +42,31 @@ struct ContentView: View {
         } message: {
             Text(library.note(library.deletionRequest)?.summary.title ?? "")
         }
+        .confirmationDialog(
+            "Delete this folder?",
+            isPresented: Binding(
+                get: { library.folderDeletionRequest != nil },
+                set: { if !$0 { library.folderDeletionRequest = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) {
+                if let folder = library.folderDeletionRequest {
+                    library.folderDeletionRequest = nil
+                    library.deleteFolder(folder)
+                }
+            }
+            Button("Cancel", role: .cancel) { library.folderDeletionRequest = nil }
+        } message: {
+            if let folder = library.folderDeletionRequest {
+                let count = library.noteCount(in: folder)
+                Text(
+                    count == 0
+                        ? "“\(folder.lastPathComponent)” is empty."
+                        : "“\(folder.lastPathComponent)” and the \(count) note\(count == 1 ? "" : "s") inside it."
+                )
+            }
+        }
     }
 }
 
