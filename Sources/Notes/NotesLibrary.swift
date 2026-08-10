@@ -69,7 +69,10 @@ final class NotesLibrary: ObservableObject {
         guard url != folderURL else { return }
         flushPending()
 
-        folderURL = url
+        // Resolved, not merely standardized: a notes folder reached through a
+        // symlink hands back paths from the other side of it, and every folder
+        // comparison here is a string comparison.
+        folderURL = url?.resolvingSymlinksInPath()
         notes = []
         savedText = [:]
         selection = nil
@@ -115,6 +118,7 @@ final class NotesLibrary: ObservableObject {
         return enumerator
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension.lowercased() == "md" }
+            .map { $0.resolvingSymlinksInPath() }
     }
 
     private func modificationDate(of url: URL) -> Date {
@@ -138,6 +142,7 @@ final class NotesLibrary: ObservableObject {
         return enumerator
             .compactMap { $0 as? URL }
             .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
+            .map { $0.resolvingSymlinksInPath() }
             .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
     }
 

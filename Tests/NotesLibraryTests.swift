@@ -10,8 +10,11 @@ final class NotesLibraryTests: XCTestCase {
 
     /// A throwaway directory per run. Not a real notes folder: these tests
     /// create and delete files, and must run on any machine.
+    /// Resolved, because the temp directory is reached through /var -> /private/var
+    /// and the library compares folder paths as strings.
     private static let scratchRoot = FileManager.default.temporaryDirectory
         .appending(path: "dexedit-tests", directoryHint: .isDirectory)
+        .resolvingSymlinksInPath()
 
     private var folder: URL!
     private var library: NotesLibrary!
