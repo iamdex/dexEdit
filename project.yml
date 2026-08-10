@@ -35,8 +35,10 @@ targets:
       - path: Sources
       # The file layer is the same app on both platforms.
       - path: Shared
-      # Only the catalog, so the entitlements file beside it stays out of the bundle.
+      # Only the catalog and the manifest, so the entitlements file beside them
+      # stays out of the bundle.
       - path: Resources/Assets.xcassets
+      - path: Resources/PrivacyInfo.xcprivacy
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit
@@ -61,6 +63,8 @@ targets:
       - path: iOS
       # The file layer is the same app on both platforms.
       - path: Shared
+      # Same declaration for both: the app does the same things on each.
+      - path: Resources/PrivacyInfo.xcprivacy
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit

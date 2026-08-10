@@ -31,7 +31,13 @@ enum LaunchTimer {
 
     /// When this process was spawned, straight from the kernel — the only
     /// honest starting line, since anything in Swift already missed dyld.
+    ///
+    /// macOS only. The launch budget was a Mac concern, and asking the kernel
+    /// about process start times is exactly the sort of call an App Store
+    /// privacy manifest has to account for. Not worth carrying on iOS for
+    /// instrumentation nobody runs there.
     private static var processStart: Date? {
+        #if os(macOS)
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
@@ -42,5 +48,8 @@ enum LaunchTimer {
         return Date(
             timeIntervalSince1970: Double(started.tv_sec) + Double(started.tv_usec) / 1_000_000
         )
+        #else
+        return nil
+        #endif
     }
 }
