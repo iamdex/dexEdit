@@ -9,6 +9,7 @@ import UIKit
 struct MarkdownTextView: UIViewRepresentable {
     @Binding var text: String
     var mode: EditorMode = .styled
+    var bridge: EditorBridge
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, mode: mode)
@@ -50,6 +51,18 @@ struct MarkdownTextView: UIViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.replaceText(with: text)
 
+        // The formatting bar reaches the editor through here.
+        bridge.textView = textView
+        context.coordinator.onSelectionChanged = { [weak bridge] in
+            bridge?.refreshActiveFormats()
+        }
+        bridge.refreshActiveFormats()
+
+        if bridge.wantsFocus {
+            bridge.wantsFocus = false
+            DispatchQueue.main.async { textView.becomeFirstResponder() }
+        }
+
         return textView
     }
 
@@ -69,6 +82,9 @@ struct MarkdownTextView: UIViewRepresentable {
         @Binding private var text: String
         var mode: EditorMode
         weak var textView: UITextView?
+
+        /// Tells the formatting bar the cursor moved.
+        var onSelectionChanged: (() -> Void)?
 
         init(text: Binding<String>, mode: EditorMode) {
             _text = text
@@ -99,6 +115,11 @@ struct MarkdownTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             text = textView.text
+            onSelectionChanged?()
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            onSelectionChanged?()
         }
 
         // MARK: - NSTextStorageDelegate

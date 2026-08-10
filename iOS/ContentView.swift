@@ -47,6 +47,9 @@ struct ContentView: View {
 
 private struct EditorPane: View {
     @EnvironmentObject private var library: NotesLibrary
+    @EnvironmentObject private var bridge: EditorBridge
+    @AppStorage("editorMode") private var mode: EditorMode = .styled
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         Group {
@@ -55,12 +58,28 @@ private struct EditorPane: View {
                     text: Binding(
                         get: { library.text(for: id) },
                         set: { library.updateText($0, for: id) }
-                    )
+                    ),
+                    mode: mode,
+                    bridge: bridge
                 )
                 .id(id)
                 .navigationTitle(library.note(id)?.summary.title ?? "")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    // On iPad the bar lives at the bottom, always reachable:
+                    // a keyboard-attached bar is invisible whenever a hardware
+                    // keyboard is connected, which on iPad is half the time.
+                    // On iPhone there is no room for that, so it rides the
+                    // keyboard instead.
+                    if sizeClass == .regular {
+                        ToolbarItem(placement: .bottomBar) {
+                            EditorToolbar()
+                        }
+                    } else {
+                        ToolbarItem(placement: .keyboard) {
+                            EditorToolbar()
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             library.deletionRequest = id
