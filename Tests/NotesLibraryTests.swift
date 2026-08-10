@@ -8,10 +8,10 @@ import XCTest
 /// removed afterwards, so nothing here can touch real notes.
 final class NotesLibraryTests: XCTestCase {
 
-    private static let scratchRoot = URL(
-        fileURLWithPath: "/Users/iamdex/Documents/test_md/.dexedit-tests",
-        isDirectory: true
-    )
+    /// A throwaway directory per run. Not a real notes folder: these tests
+    /// create and delete files, and must run on any machine.
+    private static let scratchRoot = FileManager.default.temporaryDirectory
+        .appending(path: "dexedit-tests", directoryHint: .isDirectory)
 
     private var folder: URL!
     private var library: NotesLibrary!
