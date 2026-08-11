@@ -46,6 +46,10 @@ struct EditorToolbar: View {
         // band across the screen was the honest minimum and looked like it: the
         // shape, the material and the shadow are what made the system's bar
         // read as floating above the note rather than walling it off.
+        // A SwiftUI Button takes the accent colour; inside the old UIToolbar
+        // these inherited the primary one. Ink, not links — the only colour in
+        // here should be the pill behind whatever is switched on.
+        .tint(.primary)
         .frame(height: 44)
         .background(.regularMaterial, in: Self.shape)
         .clipShape(Self.shape)
