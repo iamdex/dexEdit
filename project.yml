@@ -119,6 +119,7 @@ targets:
       # the MarkdownCore package, which carries its own tests.
       - path: Shared/NotesLibrary.swift
       - path: Shared/CoordinatedFile.swift
+      - path: Shared/FolderWatcher.swift
       - path: Shared/LaunchTimer.swift
       - path: Tests
     settings:

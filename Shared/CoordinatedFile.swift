@@ -13,6 +13,40 @@ import Foundation
 /// evicted iCloud file waits for the whole download. Check ``isDownloaded(_:)``
 /// first — that check is a cheap local lookup.
 enum CoordinatedFile {
+    /// The app's own presenter, once it has a folder to watch.
+    ///
+    /// Every coordinator here is built with it, so the app is never told about
+    /// its own writes. Without that, saving a note would announce a change, the
+    /// announcement would trigger a re-read, and the re-read would be for a
+    /// file we had just written ourselves.
+    static weak var presenter: NSFilePresenter?
+
+    private static func coordinator() -> NSFileCoordinator {
+        NSFileCoordinator(filePresenter: presenter)
+    }
+
+    /// Runs `work` while holding a read claim on a directory.
+    ///
+    /// Enumerating a file provider's folder without one gives back whatever it
+    /// last happened to cache — a note written on another device can simply not
+    /// be in the list, however long you wait. The claim is what asks the
+    /// provider to go and reconcile first.
+    static func readingDirectory(_ url: URL, _ work: () -> Void) {
+        var coordinationError: NSError?
+        var ran = false
+
+        coordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { _ in
+            ran = true
+            work()
+        }
+
+        // The accessor's URL is ignored on purpose: the caller enumerates the
+        // folder it already knows about, and for a directory the coordinator
+        // hands back that same one. A claim that couldn't be taken is a
+        // possibly-stale listing, not a missing one.
+        if !ran { work() }
+    }
+
     /// Reads every one of `urls` under a single claim, instead of one each.
     ///
     /// Taking a claim costs about 1.7ms. That is nothing for one note and most
@@ -26,7 +60,7 @@ enum CoordinatedFile {
     static func batchReading(_ urls: [URL], _ work: () -> Void) {
         guard !urls.isEmpty else { return work() }
 
-        let coordinator = NSFileCoordinator()
+        let coordinator = Self.coordinator()
         var error: NSError?
         var ran = false
 
@@ -57,7 +91,7 @@ enum CoordinatedFile {
         var failure: Error?
         var coordinationError: NSError?
 
-        (batch ?? NSFileCoordinator()).coordinate(
+        (batch ?? coordinator()).coordinate(
             readingItemAt: url, options: [], error: &coordinationError
         ) { actual in
             do {
@@ -82,7 +116,7 @@ enum CoordinatedFile {
         var failure: Error?
         var coordinationError: NSError?
 
-        NSFileCoordinator().coordinate(
+        coordinator().coordinate(
             writingItemAt: url, options: .forReplacing, error: &coordinationError
         ) { actual in
             do {
@@ -101,7 +135,7 @@ enum CoordinatedFile {
     static func move(_ source: URL, to destination: URL) throws {
         var failure: Error?
         var coordinationError: NSError?
-        let coordinator = NSFileCoordinator()
+        let coordinator = Self.coordinator()
 
         coordinator.coordinate(
             writingItemAt: source, options: .forMoving,
@@ -128,7 +162,7 @@ enum CoordinatedFile {
         var failure: Error?
         var coordinationError: NSError?
 
-        NSFileCoordinator().coordinate(
+        coordinator().coordinate(
             writingItemAt: url, options: .forDeleting, error: &coordinationError
         ) { actual in
             do {
@@ -202,7 +236,7 @@ enum CoordinatedFile {
 
             var wrote = false
             var coordinationError: NSError?
-            NSFileCoordinator().coordinate(
+            coordinator().coordinate(
                 writingItemAt: target, options: .forReplacing, error: &coordinationError
             ) { actual in
                 wrote = (try? version.replaceItem(at: actual)) != nil
@@ -234,7 +268,7 @@ enum CoordinatedFile {
         var failure: Error?
         var coordinationError: NSError?
 
-        NSFileCoordinator().coordinate(
+        coordinator().coordinate(
             writingItemAt: url, options: .forReplacing, error: &coordinationError
         ) { actual in
             do {

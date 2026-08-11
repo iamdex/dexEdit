@@ -603,6 +603,42 @@ final class NotesLibraryTests: XCTestCase {
         XCTAssertEqual(library.filteredNotes.count, 2)
     }
 
+    // MARK: - Noticing someone else
+
+    func testANoteWrittenByAnotherWriterArrivesWithoutBeingAskedFor() throws {
+        try write("# Mine", to: "mine.md")
+        library.setFolder(folder)
+        XCTAssertEqual(library.notes.count, 1)
+
+        // A coordinated write from a coordinator that isn't ours — which is
+        // what another device's sync client is. Nothing here calls sync: the
+        // whole point is that the app is told rather than having to ask.
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(
+            writingItemAt: folder.appending(path: "theirs.md"),
+            options: .forReplacing,
+            error: &coordinationError
+        ) { url in
+            try? "# Theirs".write(to: url, atomically: true, encoding: .utf8)
+        }
+        XCTAssertNil(coordinationError)
+
+        let arrived = expectation(description: "the other writer's note appears")
+        let deadline = Date(timeIntervalSinceNow: 5)
+        let poll = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            if self.library.notes.contains(where: { $0.summary.title == "Theirs" }) {
+                timer.invalidate()
+                arrived.fulfill()
+            } else if Date() > deadline {
+                timer.invalidate()
+            }
+        }
+        defer { poll.invalidate() }
+
+        wait(for: [arrived], timeout: 6)
+        XCTAssertEqual(library.notes.count, 2)
+    }
+
     // MARK: - Notes the app can't read
 
     /// The iCloud case in miniature: a file that exists and cannot be read.

@@ -53,6 +53,10 @@ final class NotesLibrary: ObservableObject {
     private var downloadWatcher: Timer?
     private static let downloadPollInterval: TimeInterval = 2.0
 
+    /// Tells the app when someone else changes the folder, so a note written on
+    /// another device turns up without the app being brought to the front.
+    private var watcher: FolderWatcher?
+
     /// What is currently on disk for each note, so an untouched note is never
     /// rewritten.
     private var savedText: [Note.ID: String] = [:]
@@ -69,6 +73,7 @@ final class NotesLibrary: ObservableObject {
     }
 
     deinit {
+        watcher?.stop()
         downloadWatcher?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
     }
@@ -90,11 +95,26 @@ final class NotesLibrary: ObservableObject {
         // Nothing left to wait for; the notes it was waiting on are gone.
         watchForDownloads()
 
+        watcher?.stop()
+        watcher = nil
+        CoordinatedFile.presenter = nil
+
         guard url != nil else { return }
         LaunchTimer.mark("folder load start")
         loadFromDisk()
         LaunchTimer.mark("folder loaded (\(notes.count) notes)")
         selection = notes.first?.id
+
+        // After the first read, not before: registering a presenter on a folder
+        // the app is in the middle of reading only invites it to announce that
+        // very read back to us.
+        if let folderURL {
+            let watcher = FolderWatcher(folder: folderURL) { [weak self] in
+                self?.syncWithDisk()
+            }
+            self.watcher = watcher
+            CoordinatedFile.presenter = watcher
+        }
     }
 
     private func loadFromDisk() {
@@ -152,6 +172,18 @@ final class NotesLibrary: ObservableObject {
     /// subfolder used to be invisible to the app rather than merely unsorted.
     private func markdownFiles() -> [URL] {
         guard let folderURL else { return [] }
+
+        // Under a claim on the folder, so the file provider reconciles before
+        // being asked what's in there. Without it the listing is whatever it
+        // last cached, and a note from another device never appears at all.
+        var found: [URL] = []
+        CoordinatedFile.readingDirectory(folderURL) {
+            found = enumerateMarkdown(in: folderURL)
+        }
+        return found
+    }
+
+    private func enumerateMarkdown(in folderURL: URL) -> [URL] {
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
@@ -190,6 +222,15 @@ final class NotesLibrary: ObservableObject {
     /// in it. Read from disk, not derived from note paths.
     private func scanFolders() -> [URL] {
         guard let folderURL else { return [] }
+
+        var found: [URL] = []
+        CoordinatedFile.readingDirectory(folderURL) {
+            found = enumerateFolders(in: folderURL)
+        }
+        return found
+    }
+
+    private func enumerateFolders(in folderURL: URL) -> [URL] {
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey],
