@@ -42,6 +42,11 @@ struct EditorToolbar: View {
             }
             .padding(.horizontal, 4)
         }
+        // Its own chrome now that it no longer sits inside a UIToolbar: the
+        // note's text would otherwise scroll visibly underneath it.
+        .padding(.vertical, 5)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 
     private var headingMenu: some View {

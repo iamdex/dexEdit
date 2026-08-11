@@ -132,17 +132,20 @@ private struct EditorPane: View {
                     bridge: bridge
                 )
                 .id(id)
+                // Part of the view, not of the navigation bar's toolbar.
+                //
+                // A bottom bar is a UIToolbar, and UIKit never lifts one out of
+                // the keyboard's way, so the keyboard simply buried it. A safe
+                // area inset is moved by the keyboard and stays put when there
+                // isn't one — which is the whole requirement: reachable while
+                // typing, and still there once the keyboard is dismissed or a
+                // hardware one is attached.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    EditorToolbar()
+                }
                 .navigationTitle(library.note(id)?.summary.title ?? "")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // The bottom bar on both, rather than riding the keyboard:
-                    // a keyboard-attached bar is invisible whenever a hardware
-                    // keyboard is connected, and on iPhone it left no way to
-                    // format at all once the keyboard was dismissed. The system
-                    // lifts this above the keyboard when one appears.
-                    ToolbarItem(placement: .bottomBar) {
-                        EditorToolbar()
-                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             library.deletionRequest = id
