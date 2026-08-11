@@ -109,8 +109,8 @@ final class NotesLibrary: ObservableObject {
         // the app is in the middle of reading only invites it to announce that
         // very read back to us.
         if let folderURL {
-            let watcher = FolderWatcher(folder: folderURL) { [weak self] in
-                self?.syncWithDisk()
+            let watcher = FolderWatcher(folder: folderURL) { [weak self] changed in
+                self?.syncWithDisk(reReading: changed)
             }
             self.watcher = watcher
             CoordinatedFile.presenter = watcher
@@ -596,7 +596,12 @@ final class NotesLibrary: ObservableObject {
             try CoordinatedFile.write(text, to: url)
             notes[index].fileURL = url
             destinations.removeValue(forKey: notes[index].id)
-            notes[index].modified = .now
+            // The file's own date, not the clock. Recording a moment slightly
+            // later than the one the filesystem recorded left the app believing
+            // it held something newer than the file did — and an edit arriving
+            // from another device with an honest, earlier date was discarded
+            // as stale.
+            notes[index].modified = CoordinatedFile.state(of: url).modified
             savedText[notes[index].id] = text
             errorMessage = nil
             sortNotes()
@@ -650,7 +655,12 @@ final class NotesLibrary: ObservableObject {
         syncWithDisk()
     }
 
-    func syncWithDisk() {
+    /// - Parameter reReading: files the file provider named as changed. These
+    ///   are re-read whatever their modification date says. The date is a poor
+    ///   witness across devices — it is written by whichever one made the edit,
+    ///   and compared against a value this app partly made up — whereas being
+    ///   told the file changed is not a guess at all.
+    func syncWithDisk(reReading forced: Set<URL> = []) {
         guard folderURL != nil else { return }
         LaunchTimer.mark("sync start")
         defer {
@@ -704,11 +714,13 @@ final class NotesLibrary: ObservableObject {
             if let index = notes.firstIndex(
                 where: { $0.fileURL?.standardizedFileURL == url.standardizedFileURL }
             ) {
-                // A note we couldn't read last time is retried every sync, even
-                // with an unchanged date: a download landing doesn't touch the
-                // modification date, and that is exactly the moment the note
-                // has to turn into itself.
-                guard modified > notes[index].modified || !notes[index].isReady
+                // Three reasons to look again, and only the first is a guess:
+                // a newer date; a note we couldn't read last time, since a
+                // download landing doesn't touch the date; and the provider
+                // having told us in so many words that this file changed.
+                guard forced.contains(url.standardizedFileURL)
+                        || modified > notes[index].modified
+                        || !notes[index].isReady
                 else { continue }
 
                 let fresh = fetch(url, id: notes[index].id)

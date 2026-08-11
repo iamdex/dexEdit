@@ -639,6 +639,44 @@ final class NotesLibraryTests: XCTestCase {
         XCTAssertEqual(library.notes.count, 2)
     }
 
+    func testAnEditByAnotherWriterArrivesWithoutBeingAskedFor() throws {
+        try write("# Shared\noriginal", to: "shared.md")
+        library.setFolder(folder)
+        XCTAssertEqual(library.notes.first?.text, "# Shared\noriginal")
+
+        // The same file, rewritten by someone else, and — as a file coming down
+        // from iCloud does — carrying the date it had on the device that wrote
+        // it rather than a fresh one. Backdated on purpose: an edit made while
+        // the two devices disagree about the time, or within the same second,
+        // must still arrive. Nothing about "changed" means "later".
+        let url = folder.appending(path: "shared.md")
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(
+            writingItemAt: url, options: .forReplacing, error: &coordinationError
+        ) { actual in
+            try? "# Shared\nedited elsewhere".write(to: actual, atomically: true, encoding: .utf8)
+            try? FileManager.default.setAttributes(
+                [.modificationDate: Date(timeIntervalSinceNow: -600)],
+                ofItemAtPath: actual.path
+            )
+        }
+        XCTAssertNil(coordinationError)
+
+        let arrived = expectation(description: "the edit shows up")
+        let deadline = Date(timeIntervalSinceNow: 5)
+        let poll = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            if self.library.notes.first?.text == "# Shared\nedited elsewhere" {
+                timer.invalidate()
+                arrived.fulfill()
+            } else if Date() > deadline {
+                timer.invalidate()
+            }
+        }
+        defer { poll.invalidate() }
+
+        wait(for: [arrived], timeout: 6)
+    }
+
     // MARK: - Notes the app can't read
 
     /// The iCloud case in miniature: a file that exists and cannot be read.

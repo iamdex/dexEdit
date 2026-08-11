@@ -20,10 +20,15 @@ final class FolderWatcher: NSObject, NSFilePresenter {
     let presentedItemURL: URL?
     let presentedItemOperationQueue: OperationQueue = .main
 
-    private let onChange: () -> Void
+    private let onChange: (Set<URL>) -> Void
     private var pending: DispatchWorkItem?
 
-    init(folder: URL, onChange: @escaping () -> Void) {
+    /// Which files were named as having changed, since the last answer. Empty
+    /// means "something did" without saying what, which is a reason to look at
+    /// everything rather than a reason to look at nothing.
+    private var changed: Set<URL> = []
+
+    init(folder: URL, onChange: @escaping (Set<URL>) -> Void) {
         self.presentedItemURL = folder
         self.onChange = onChange
         super.init()
@@ -41,8 +46,18 @@ final class FolderWatcher: NSObject, NSFilePresenter {
     // MARK: - NSFilePresenter
 
     func presentedItemDidChange() { scheduleRefresh() }
-    func presentedSubitemDidChange(at url: URL) { scheduleRefresh() }
-    func presentedSubitemDidAppear(at url: URL) { scheduleRefresh() }
+
+    func presentedSubitemDidChange(at url: URL) {
+        // Kept, and passed on. Being told which file changed is worth more than
+        // any guess the app could make afterwards from timestamps.
+        changed.insert(url.resolvingSymlinksInPath().standardizedFileURL)
+        scheduleRefresh()
+    }
+
+    func presentedSubitemDidAppear(at url: URL) {
+        changed.insert(url.resolvingSymlinksInPath().standardizedFileURL)
+        scheduleRefresh()
+    }
 
     func accommodatePresentedSubitemDeletion(
         at url: URL,
@@ -55,8 +70,14 @@ final class FolderWatcher: NSObject, NSFilePresenter {
     private func scheduleRefresh() {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            self?.pending = nil
-            self?.onChange()
+            guard let self else { return }
+            self.pending = nil
+            // Handed over and cleared together, so a change announced while the
+            // answer is being worked out starts the next batch instead of being
+            // swallowed by this one.
+            let named = self.changed
+            self.changed = []
+            self.onChange(named)
         }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.settleDelay, execute: work)
