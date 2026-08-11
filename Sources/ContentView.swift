@@ -87,18 +87,22 @@ private struct EditorPane: View {
 
     var body: some View {
         Group {
-            if let id = library.selection, library.note(id) != nil {
-                MarkdownTextView(
-                    text: Binding(
-                        get: { library.text(for: id) },
-                        set: { library.updateText($0, for: id) }
-                    ),
-                    mode: mode,
-                    bridge: bridge
-                )
-                // A fresh text view per note: focus lands in it, and undo never
-                // reaches back into the note you just left.
-                .id(id)
+            if let id = library.selection, let note = library.note(id) {
+                if note.isReady {
+                    MarkdownTextView(
+                        text: Binding(
+                            get: { library.text(for: id) },
+                            set: { library.updateText($0, for: id) }
+                        ),
+                        mode: mode,
+                        bridge: bridge
+                    )
+                    // A fresh text view per note: focus lands in it, and undo
+                    // never reaches back into the note you just left.
+                    .id(id)
+                } else {
+                    UnopenedNoteView(note: note)
+                }
             } else {
                 VStack(spacing: 6) {
                     Text("No note selected")
@@ -121,6 +125,51 @@ private struct EditorPane: View {
                     .background(.red, in: RoundedRectangle(cornerRadius: 6))
                     .padding(12)
             }
+        }
+    }
+}
+
+/// A note that is listed but couldn't be opened.
+///
+/// Deliberately not an empty editor. An empty editor invites a keystroke, and
+/// one keystroke would write emptiness over a file whose real contents are
+/// sitting in iCloud, perfectly intact.
+private struct UnopenedNoteView: View {
+    let note: Note
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 34))
+                .foregroundStyle(.secondary)
+            Text(note.summary.title)
+                .font(.title3)
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private var symbol: String {
+        switch note.availability {
+        case .notDownloaded: "icloud.and.arrow.down"
+        default: "exclamationmark.triangle"
+        }
+    }
+
+    private var message: String {
+        switch note.availability {
+        case .notDownloaded:
+            "This note is in iCloud and hasn’t reached this device yet. "
+                + "It will open by itself once it arrives."
+        case .unreadable(let reason):
+            reason
+        case .ready:
+            ""
         }
     }
 }

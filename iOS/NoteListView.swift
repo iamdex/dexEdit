@@ -66,7 +66,7 @@ struct NoteListView: View {
                 }
             } else {
                 ForEach(library.filteredNotes) { note in
-                    NoteRow(summary: note.summary, folder: library.folderLabel(for: note))
+                    NoteRow(summary: note.summary, availability: note.availability, folder: library.folderLabel(for: note))
                         .tag(note.id)
                         .draggable(SidebarDrop.note(note.id))
                 }
@@ -174,7 +174,7 @@ private struct FolderRows: View {
 
             case .note(let id):
                 if let note = library.note(id) {
-                    NoteRow(summary: note.summary, folder: nil)
+                    NoteRow(summary: note.summary, availability: note.availability, folder: nil)
                         .tag(id)
                         .draggable(SidebarDrop.note(id))
                 }
@@ -278,12 +278,20 @@ private struct FolderLabel: View {
 
 private struct NoteRow: View {
     let summary: Note.Summary
+    let availability: Note.Availability
     let folder: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(summary.title)
-                .lineLimit(1)
+            HStack(spacing: 5) {
+                if let statusSymbol {
+                    Image(systemName: statusSymbol)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(summary.title)
+                    .lineLimit(1)
+            }
             HStack(spacing: 5) {
                 if let folder {
                     Label(folder, systemImage: "folder")
@@ -300,5 +308,15 @@ private struct NoteRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Nothing at all for a normal note. Only a note the app is holding but
+    /// couldn't open needs to say so — it is still listed, and still there.
+    private var statusSymbol: String? {
+        switch availability {
+        case .ready: nil
+        case .notDownloaded: "arrow.down.circle"
+        case .unreadable: "exclamationmark.triangle"
+        }
     }
 }

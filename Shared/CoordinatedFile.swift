@@ -104,6 +104,37 @@ enum CoordinatedFile {
         if let failure { throw failure }
     }
 
+    /// What the filesystem knows about a note file, in one lookup.
+    struct State {
+        var modified: Date
+        /// Whether the contents are actually on this device. A file with no
+        /// iCloud status isn't in iCloud, and is therefore here.
+        var isDownloaded: Bool
+        var hasConflicts: Bool
+    }
+
+    /// A cheap, purely local question — unlike reading the file, which for an
+    /// evicted iCloud file means waiting for the network.
+    static func state(of url: URL) -> State {
+        let values = try? url.resourceValues(forKeys: [
+            .contentModificationDateKey,
+            .ubiquitousItemDownloadingStatusKey,
+            .ubiquitousItemHasUnresolvedConflictsKey,
+        ])
+
+        return State(
+            modified: values?.contentModificationDate ?? .distantPast,
+            isDownloaded: values?.ubiquitousItemDownloadingStatus != .notDownloaded,
+            hasConflicts: values?.ubiquitousItemHasUnresolvedConflicts ?? false
+        )
+    }
+
+    /// Asks iCloud for a file's contents. Returns immediately; the file arrives
+    /// when it arrives, or not at all if there is no connection.
+    static func startDownload(_ url: URL) {
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+    }
+
     /// Creates a directory. Coordinated for the same reason a write is: the
     /// provider may be about to create something by that very name.
     static func createDirectory(at url: URL) throws {

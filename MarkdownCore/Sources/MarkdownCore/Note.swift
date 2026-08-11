@@ -12,11 +12,35 @@ public struct Note: Identifiable, Equatable {
     public var text: String
     public var modified: Date
 
-    public init(id: UUID = UUID(), fileURL: URL?, text: String, modified: Date = .now) {
+    /// Whether `text` is really this note's text.
+    ///
+    /// A note whose file exists but whose contents couldn't be read is still a
+    /// note — dropping it from the list is indistinguishable from losing it.
+    /// It is listed, it is never editable, and it is never written back.
+    public enum Availability: Equatable {
+        case ready
+        /// In iCloud, not on this device yet. The download has been asked for.
+        case notDownloaded
+        /// On disk, unreadable: permissions, or not valid UTF-8.
+        case unreadable(String)
+    }
+
+    public var availability: Availability
+
+    public var isReady: Bool { availability == .ready }
+
+    public init(
+        id: UUID = UUID(),
+        fileURL: URL?,
+        text: String,
+        modified: Date = .now,
+        availability: Availability = .ready
+    ) {
         self.id = id
         self.fileURL = fileURL
         self.text = text
         self.modified = modified
+        self.availability = availability
     }
 
     /// What the sidebar shows: a title and a one-line taste of the body.
@@ -28,6 +52,17 @@ public struct Note: Identifiable, Equatable {
     /// Derived on demand. Only the head of the note is scanned, so this stays
     /// cheap even when it is called once per row per redraw.
     public var summary: Summary {
+        // With no text to derive a title from, the filename is what is left —
+        // and it was made from the title in the first place.
+        switch availability {
+        case .notDownloaded:
+            return Summary(title: filenameTitle, preview: "Waiting for iCloud…")
+        case .unreadable(let reason):
+            return Summary(title: filenameTitle, preview: reason)
+        case .ready:
+            break
+        }
+
         let lines = Self.headLines(of: text)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -53,6 +88,18 @@ public struct Note: Identifiable, Equatable {
 
     /// The filename this note wants, without the extension.
     public var slug: String { Self.slug(for: summary.title) }
+
+    /// The filename read back as a title: the slug undone as far as it can be.
+    /// Word breaks survive; capitals and punctuation don't, and nothing here
+    /// pretends otherwise.
+    private var filenameTitle: String {
+        guard let base = fileURL?.deletingPathExtension().lastPathComponent,
+              !base.isEmpty
+        else { return "Untitled" }
+
+        let words = base.replacingOccurrences(of: "-", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
 
     // MARK: - Derivation
 

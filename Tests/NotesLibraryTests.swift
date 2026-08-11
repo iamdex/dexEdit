@@ -602,4 +602,68 @@ final class NotesLibraryTests: XCTestCase {
         library.searchText = ""
         XCTAssertEqual(library.filteredNotes.count, 2)
     }
+
+    // MARK: - Notes the app can't read
+
+    /// The iCloud case in miniature: a file that exists and cannot be read.
+    /// Whatever the reason, the answer has to be the same — the note is listed.
+    private func writeUnreadable(_ name: String) throws {
+        // 0xFF can never appear in UTF-8, so this file has no valid decoding.
+        try Data([0xFF, 0xFF, 0xFF]).write(to: folder.appending(path: name))
+    }
+
+    func testAnUnreadableFileIsStillListed() throws {
+        try write("# Fine", to: "fine.md")
+        try writeUnreadable("summer-plans.md")
+
+        library.setFolder(folder)
+
+        XCTAssertEqual(library.notes.count, 2, "a note that can't be read must not vanish")
+
+        let broken = try XCTUnwrap(library.notes.first { !$0.isReady })
+        XCTAssertEqual(broken.summary.title, "Summer plans", "titled by its filename")
+        guard case .unreadable = broken.availability else {
+            return XCTFail("expected .unreadable, got \(broken.availability)")
+        }
+    }
+
+    func testAnUnreadableNoteIsNeverWrittenOver() throws {
+        try writeUnreadable("secrets.md")
+        library.setFolder(folder)
+
+        let id = try XCTUnwrap(library.notes.first?.id)
+        library.updateText("this must never reach the disk", for: id)
+        library.flushPending()
+
+        XCTAssertEqual(
+            try Data(contentsOf: folder.appending(path: "secrets.md")),
+            Data([0xFF, 0xFF, 0xFF]),
+            "the file still holds what it held"
+        )
+        XCTAssertEqual(filenames, ["secrets.md"], "and was not renamed to its empty title")
+    }
+
+    func testAnUnreadableNoteBecomesRealWhenItCanBeRead() throws {
+        try writeUnreadable("arriving.md")
+        library.setFolder(folder)
+        XCTAssertFalse(try XCTUnwrap(library.notes.first).isReady)
+
+        let id = try XCTUnwrap(library.notes.first?.id)
+
+        // What a finished iCloud download looks like from here: same file,
+        // readable now, and — crucially — no newer modification date.
+        let url = folder.appending(path: "arriving.md")
+        let stamp = try XCTUnwrap(
+            url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        )
+        try write("# Arriving\nbody", to: "arriving.md")
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+
+        library.syncWithDisk()
+
+        let note = try XCTUnwrap(library.notes.first)
+        XCTAssertTrue(note.isReady)
+        XCTAssertEqual(note.summary.title, "Arriving")
+        XCTAssertEqual(note.id, id, "the same note, not a replacement")
+    }
 }

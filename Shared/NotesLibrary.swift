@@ -49,6 +49,10 @@ final class NotesLibrary: ObservableObject {
     private var lastReadFromDisk = Date.distantPast
     private static let syncCooldown: TimeInterval = 1.0
 
+    /// Runs only while a note is waiting on iCloud. See `watchForDownloads`.
+    private var downloadWatcher: Timer?
+    private static let downloadPollInterval: TimeInterval = 2.0
+
     /// What is currently on disk for each note, so an untouched note is never
     /// rewritten.
     private var savedText: [Note.ID: String] = [:]
@@ -65,6 +69,7 @@ final class NotesLibrary: ObservableObject {
     }
 
     deinit {
+        downloadWatcher?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
     }
 
@@ -82,6 +87,8 @@ final class NotesLibrary: ObservableObject {
         savedText = [:]
         selection = nil
         errorMessage = nil
+        // Nothing left to wait for; the notes it was waiting on are gone.
+        watchForDownloads()
 
         guard url != nil else { return }
         LaunchTimer.mark("folder load start")
@@ -95,16 +102,46 @@ final class NotesLibrary: ObservableObject {
 
         var loaded: [Note] = []
         for url in markdownFiles() {
-            guard let text = try? CoordinatedFile.read(url) else { continue }
-            let note = Note(fileURL: url, text: text, modified: modificationDate(of: url))
+            let note = fetch(url)
             loaded.append(note)
-            savedText[note.id] = text
+            savedText[note.id] = note.text
         }
 
         notes = loaded
         folders = scanFolders()
         sortNotes()
         lastReadFromDisk = .now
+        watchForDownloads()
+    }
+
+    /// Reads a note, or records why it couldn't be read. Never returns nothing:
+    /// a file that exists is a note, and a note quietly missing from the list is
+    /// indistinguishable from a note that was lost.
+    private func fetch(_ url: URL, id: Note.ID? = nil) -> Note {
+        let state = CoordinatedFile.state(of: url)
+
+        func note(_ text: String, _ availability: Note.Availability) -> Note {
+            Note(
+                id: id ?? UUID(),
+                fileURL: url,
+                text: text,
+                modified: state.modified,
+                availability: availability
+            )
+        }
+
+        // Never coordinate a read of a file that isn't here: that call blocks
+        // until the download finishes, which with no connection is forever.
+        guard state.isDownloaded else {
+            CoordinatedFile.startDownload(url)
+            return note("", .notDownloaded)
+        }
+
+        do {
+            return note(try CoordinatedFile.read(url), .ready)
+        } catch {
+            return note("", .unreadable(error.localizedDescription))
+        }
     }
 
     /// Every .md file under the notes folder, at any depth. Notes sitting in a
@@ -388,6 +425,9 @@ final class NotesLibrary: ObservableObject {
 
     func updateText(_ newText: String, for id: Note.ID) {
         guard let index = notes.firstIndex(where: { $0.id == id }),
+              // A note whose file we couldn't read has no text to change, and
+              // an empty editor must never become the file's new contents.
+              notes[index].isReady,
               notes[index].text != newText
         else { return }
 
@@ -476,6 +516,8 @@ final class NotesLibrary: ObservableObject {
 
     private func writeIfNeeded(_ id: Note.ID) {
         guard let folderURL, let index = notes.firstIndex(where: { $0.id == id }) else { return }
+        // Whatever is in that file, it is not what we are holding. Leave it.
+        guard notes[index].isReady else { return }
 
         let text = notes[index].text
         guard savedText[id] != text else { return }
@@ -513,6 +555,9 @@ final class NotesLibrary: ObservableObject {
         writeIfNeeded(id)
 
         guard let index = notes.firstIndex(where: { $0.id == id }),
+              // The title comes from the text, so a note we couldn't read would
+              // rename a real file to "untitled".
+              notes[index].isReady,
               let currentURL = notes[index].fileURL
         else { return }
 
@@ -603,30 +648,63 @@ final class NotesLibrary: ObservableObject {
             if let index = notes.firstIndex(
                 where: { $0.fileURL?.standardizedFileURL == url.standardizedFileURL }
             ) {
-                guard modified > notes[index].modified,
-                      let text = try? CoordinatedFile.read(url),
-                      text != notes[index].text
+                // A note we couldn't read last time is retried every sync, even
+                // with an unchanged date: a download landing doesn't touch the
+                // modification date, and that is exactly the moment the note
+                // has to turn into itself.
+                guard modified > notes[index].modified || !notes[index].isReady
                 else { continue }
-                notes[index].text = text
-                notes[index].modified = modified
-                savedText[notes[index].id] = text
+
+                let fresh = fetch(url, id: notes[index].id)
+                guard fresh.text != notes[index].text
+                        || fresh.availability != notes[index].availability
+                else { continue }
+
+                notes[index] = fresh
+                savedText[fresh.id] = fresh.text
                 changed = true
             } else if !known.contains(url.standardizedFileURL) {
                 // A note created outside the app.
-                guard let text = try? CoordinatedFile.read(url) else { continue }
-                let note = Note(fileURL: url, text: text, modified: modified)
+                let note = fetch(url)
                 notes.append(note)
-                savedText[note.id] = text
+                savedText[note.id] = note.text
                 changed = true
             }
         }
 
         folders = scanFolders()
+        watchForDownloads()
 
         guard changed else { return }
         sortNotes()
         if selection == nil || !notes.contains(where: { $0.id == selection }) {
             selection = notes.first?.id
+        }
+    }
+
+    // MARK: - Downloads
+
+    /// Keeps asking, while anything is still on its way down.
+    ///
+    /// A file arriving from iCloud changes nothing the app would otherwise
+    /// notice — no notification, and not even a new modification date — so the
+    /// only way a pending note becomes a real one is by looking again. The
+    /// timer exists only while there is something to wait for, so an ordinary
+    /// local folder never starts one.
+    private func watchForDownloads() {
+        let waiting = notes.contains { $0.availability == .notDownloaded }
+
+        guard waiting else {
+            downloadWatcher?.invalidate()
+            downloadWatcher = nil
+            return
+        }
+        guard downloadWatcher == nil else { return }
+
+        downloadWatcher = Timer.scheduledTimer(
+            withTimeInterval: Self.downloadPollInterval, repeats: true
+        ) { [weak self] _ in
+            self?.syncWithDisk()
         }
     }
 
