@@ -27,6 +27,16 @@ final class NotesFolderStore: ObservableObject {
     /// Called with whatever the document picker handed back.
     func adopt(_ url: URL) {
         stopAccessing()
+
+        // The picker hands back a security-scoped URL, and the scope has to be
+        // open even to ask for a bookmark. Without it the sandbox can't so much
+        // as stat the folder, and reports it as missing — which is what every
+        // iCloud Drive folder did, since those live outside the sandbox and
+        // come from the file provider. A folder on the device could get away
+        // without this; one in iCloud never could.
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
         do {
             let data = try url.bookmarkData(
                 options: [],
