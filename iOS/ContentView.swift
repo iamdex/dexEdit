@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var library: NotesLibrary
     @EnvironmentObject private var bridge: EditorBridge
     @AppStorage("editorMode") private var mode: EditorMode = .styled
+    @ObservedObject private var capture = QuickCapture.shared
 
     var body: some View {
         Group {
@@ -20,10 +21,18 @@ struct ContentView: View {
                 WelcomeView()
             }
         }
-        .onAppear { library.setFolder(folderStore.folderURL) }
+        .onAppear {
+            library.setFolder(folderStore.folderURL)
+            startQuickCaptureIfAsked()
+        }
         .onChange(of: folderStore.folderURL) { _, newValue in
             library.setFolder(newValue)
+            startQuickCaptureIfAsked()
         }
+        // Both, because the control can arrive either way round: a cold launch
+        // raises the flag before there is a folder to write into, and a warm
+        // one finds the app already sitting there.
+        .onChange(of: capture.isPending) { _, _ in startQuickCaptureIfAsked() }
         .fileImporter(
             isPresented: $folderStore.isPickingFolder,
             allowedContentTypes: [.folder]
@@ -96,6 +105,18 @@ struct ContentView: View {
             }
             .hidden()
         }
+    }
+
+    /// Turns a request from the control into the note it asked for.
+    ///
+    /// Held until there is a folder open: a control pressed on a cold launch
+    /// runs before the app has read one, and a new note with nowhere to go
+    /// would simply be dropped.
+    private func startQuickCaptureIfAsked() {
+        guard capture.isPending, library.folderURL != nil else { return }
+        capture.isPending = false
+        bridge.wantsFocus = true
+        library.newNote()
     }
 }
 

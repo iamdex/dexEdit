@@ -4,7 +4,9 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var folderStore: NotesFolderStore
     @EnvironmentObject private var library: NotesLibrary
+    @EnvironmentObject private var bridge: EditorBridge
     @AppStorage("showFormatBar") private var showFormatBar = true
+    @ObservedObject private var capture = QuickCapture.shared
 
     var body: some View {
         Group {
@@ -29,10 +31,18 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { library.setFolder(folderStore.folderURL) }
+        .onAppear {
+            library.setFolder(folderStore.folderURL)
+            startQuickCaptureIfAsked()
+        }
         .onChange(of: folderStore.folderURL) { _, newValue in
             library.setFolder(newValue)
+            startQuickCaptureIfAsked()
         }
+        // The Mac has no Control Center button of its own yet, but the intent
+        // is in this target too, so "New Note" shows up in Shortcuts — and a
+        // shortcut that quietly does nothing is worse than no shortcut.
+        .onChange(of: capture.isPending) { _, _ in startQuickCaptureIfAsked() }
         .confirmationDialog(
             "Delete this note?",
             isPresented: Binding(
@@ -77,6 +87,15 @@ struct ContentView: View {
                 )
             }
         }
+    }
+
+    /// Turns a request from outside the app into the note it asked for. Held
+    /// until there is a folder open, since the request can arrive during launch.
+    private func startQuickCaptureIfAsked() {
+        guard capture.isPending, library.folderURL != nil else { return }
+        capture.isPending = false
+        bridge.wantsEditorFocus = true
+        library.newNote()
     }
 }
 

@@ -61,9 +61,14 @@ targets:
   dexEditiOS:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    # 18, not 17, for one reason: Control Center controls don't exist before it,
+    # and a note you can start without finding the app is worth more than the
+    # handful of devices left behind.
+    deploymentTarget: "18.0"
     dependencies:
       - package: MarkdownCore
+      - target: dexEditControls
+        embed: true
     sources:
       - path: iOS
       # The file layer is the same app on both platforms.
@@ -82,6 +87,27 @@ targets:
         # reachable from outside and can be moved into iCloud Drive.
         INFOPLIST_KEY_UIFileSharingEnabled: YES
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+
+  # One button, in Control Center, on the Lock Screen and on the Action button.
+  # It carries no notes and asks for no file access: it only knows how to say
+  # "new note", which the app hears in its own process.
+  dexEditControls:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: iOSControls
+      # Only the intent, which both sides have to agree on.
+      - path: Shared/QuickCapture.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit.Controls
+        PRODUCT_NAME: dexEditControls
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: dexEdit
+        # Kept outside the sources so it isn't also copied in as a resource.
+        INFOPLIST_FILE: Resources/dexEditControls-Info.plist
+        SKIP_INSTALL: YES
 
   dexEditTests:
     type: bundle.unit-test
