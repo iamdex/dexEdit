@@ -17,7 +17,10 @@ settings:
     # and renews the profiles itself from this team.
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
-    DEVELOPMENT_TEAM: H68SYWLGDR
+    # The personal team, not the one behind the work address — this is a
+    # personal app. Note it is the OU on the certificate, not the code in its
+    # name, which is the user ID.
+    DEVELOPMENT_TEAM: W24476YKGS
     CODE_SIGNING_REQUIRED: YES
     CODE_SIGNING_ALLOWED: YES
     ENABLE_HARDENED_RUNTIME: YES
