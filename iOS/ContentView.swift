@@ -110,6 +110,18 @@ private struct EditorPane: View {
                 UnopenedNoteView(note: note)
                     .navigationTitle(note.summary.title)
                     .navigationBarTitleDisplayMode(.inline)
+                    // No formatting bar — there is nothing to format — but the
+                    // trash stays: a note you can't open is one of the few you
+                    // might actually want to get rid of.
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                library.deletionRequest = id
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
+                    }
             } else if let id = library.selection, library.note(id) != nil {
                 MarkdownTextView(
                     text: Binding(
