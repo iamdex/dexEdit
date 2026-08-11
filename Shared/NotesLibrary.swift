@@ -100,11 +100,15 @@ final class NotesLibrary: ObservableObject {
     private func loadFromDisk() {
         guard folderURL != nil else { return }
 
+        let urls = splittingConflicts(markdownFiles())
         var loaded: [Note] = []
-        for url in markdownFiles() {
-            let note = fetch(url)
-            loaded.append(note)
-            savedText[note.id] = note.text
+
+        CoordinatedFile.batchReading(urls) {
+            for url in urls {
+                let note = fetch(url)
+                loaded.append(note)
+                savedText[note.id] = note.text
+            }
         }
 
         notes = loaded
@@ -161,6 +165,17 @@ final class NotesLibrary: ObservableObject {
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension.lowercased() == "md" }
             .map { $0.resolvingSymlinksInPath() }
+    }
+
+    /// The same files, plus a file for every side of an iCloud clash that was
+    /// being kept out of sight. Run before anything is read, so a conflicting
+    /// version becomes an ordinary note in the same pass that found it.
+    private func splittingConflicts(_ urls: [URL]) -> [URL] {
+        var out = urls
+        for url in urls {
+            out += CoordinatedFile.resolveConflicts(at: url)
+        }
+        return out
     }
 
     private func modificationDate(of url: URL) -> Date {
@@ -605,7 +620,7 @@ final class NotesLibrary: ObservableObject {
         // Commit our own work first, so "newer on disk" means what it says.
         flushPending()
 
-        let onDisk = markdownFiles()
+        let onDisk = splittingConflicts(markdownFiles())
         let present = Set(onDisk.map(\.standardizedFileURL))
         var changed = false
 
