@@ -95,7 +95,7 @@ final class NotesLibrary: ObservableObject {
 
         var loaded: [Note] = []
         for url in markdownFiles() {
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            guard let text = try? CoordinatedFile.read(url) else { continue }
             let note = Note(fileURL: url, text: text, modified: modificationDate(of: url))
             loaded.append(note)
             savedText[note.id] = text
@@ -190,7 +190,7 @@ final class NotesLibrary: ObservableObject {
 
         let target = parent.appending(path: cleaned)
         do {
-            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            try CoordinatedFile.createDirectory(at: target)
             folders = scanFolders()
             return target
         } catch {
@@ -229,7 +229,7 @@ final class NotesLibrary: ObservableObject {
         flushPending()
 
         do {
-            try FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+            try CoordinatedFile.trash(folder)
         } catch {
             errorMessage = "Couldn’t delete \(folder.lastPathComponent): \(error.localizedDescription)"
             return
@@ -281,7 +281,7 @@ final class NotesLibrary: ObservableObject {
         flushPending()
 
         do {
-            try FileManager.default.moveItem(at: from, to: to)
+            try CoordinatedFile.move(from, to: to)
         } catch {
             errorMessage = "Couldn’t move \(from.lastPathComponent): \(error.localizedDescription)"
             return nil
@@ -352,7 +352,7 @@ final class NotesLibrary: ObservableObject {
         let slug = current.deletingPathExtension().lastPathComponent
         let target = uniqueURL(slug: slug, in: directory, excluding: id)
         do {
-            try FileManager.default.moveItem(at: current, to: target)
+            try CoordinatedFile.move(current, to: target)
             notes[index].fileURL = target
         } catch {
             errorMessage = "Couldn’t move \(current.lastPathComponent): \(error.localizedDescription)"
@@ -436,7 +436,7 @@ final class NotesLibrary: ObservableObject {
 
         if let url = notes[index].fileURL {
             do {
-                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                try CoordinatedFile.trash(url)
             } catch {
                 errorMessage = "Couldn’t delete \(url.lastPathComponent): \(error.localizedDescription)"
                 return
@@ -495,7 +495,7 @@ final class NotesLibrary: ObservableObject {
 
     private func writeNote(at index: Int, to url: URL, text: String) {
         do {
-            try text.write(to: url, atomically: true, encoding: .utf8)
+            try CoordinatedFile.write(text, to: url)
             notes[index].fileURL = url
             destinations.removeValue(forKey: notes[index].id)
             notes[index].modified = .now
@@ -528,7 +528,7 @@ final class NotesLibrary: ObservableObject {
             excluding: id
         )
         do {
-            try FileManager.default.moveItem(at: currentURL, to: target)
+            try CoordinatedFile.move(currentURL, to: target)
             notes[index].fileURL = target
         } catch {
             errorMessage = "Couldn’t rename \(currentURL.lastPathComponent): \(error.localizedDescription)"
@@ -604,7 +604,7 @@ final class NotesLibrary: ObservableObject {
                 where: { $0.fileURL?.standardizedFileURL == url.standardizedFileURL }
             ) {
                 guard modified > notes[index].modified,
-                      let text = try? String(contentsOf: url, encoding: .utf8),
+                      let text = try? CoordinatedFile.read(url),
                       text != notes[index].text
                 else { continue }
                 notes[index].text = text
@@ -613,7 +613,7 @@ final class NotesLibrary: ObservableObject {
                 changed = true
             } else if !known.contains(url.standardizedFileURL) {
                 // A note created outside the app.
-                guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                guard let text = try? CoordinatedFile.read(url) else { continue }
                 let note = Note(fileURL: url, text: text, modified: modified)
                 notes.append(note)
                 savedText[note.id] = text

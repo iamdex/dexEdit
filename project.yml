@@ -89,6 +89,7 @@ targets:
       # Only the app-side file work lives here now; everything pure moved to
       # the MarkdownCore package, which carries its own tests.
       - path: Shared/NotesLibrary.swift
+      - path: Shared/CoordinatedFile.swift
       - path: Shared/LaunchTimer.swift
       - path: Tests
     settings:
