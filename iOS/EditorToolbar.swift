@@ -40,14 +40,22 @@ struct EditorToolbar: View {
 
                 button("curlybraces", active: mode == .raw) { mode.toggle() }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 6)
         }
-        // Its own chrome now that it no longer sits inside a UIToolbar: the
-        // note's text would otherwise scroll visibly underneath it.
-        .padding(.vertical, 5)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider() }
+        // Its own chrome now that it no longer sits inside a UIToolbar. A flat
+        // band across the screen was the honest minimum and looked like it: the
+        // shape, the material and the shadow are what made the system's bar
+        // read as floating above the note rather than walling it off.
+        .frame(height: 44)
+        .background(.regularMaterial, in: Self.shape)
+        .clipShape(Self.shape)
+        .overlay(Self.shape.strokeBorder(Color.primary.opacity(0.08)))
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
+
+    private static let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
     private var headingMenu: some View {
         Menu {
