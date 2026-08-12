@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dexEdit — un posto veloce dove mettere le note</title>
+<meta name="description" content="Un'app di note in markdown per Mac, iPhone e iPad. Ogni nota è un file .md sul tuo disco. Nessun account, nessun server, niente da esportare.">
+<link rel="icon" href="../icon.png">
+<link rel="stylesheet" href="../site.css">
+
+<link rel="canonical" href="./">
+<link rel="alternate" hreflang="en" href="../">
+<link rel="alternate" hreflang="it" href="./">
+<link rel="alternate" hreflang="x-default" href="../">
+
+<meta property="og:title" content="dexEdit — un posto veloce dove mettere le note">
+<meta property="og:description" content="Ogni nota è un file .md sul tuo disco. Nessun account, nessun server, niente da esportare.">
+<meta property="og:image" content="../icon.png">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="it">
+<meta property="og:locale:alternate" content="en">
+</head>
+
+<body>
+
+<header class="bar">
+  <span class="bar__name">dexEdit</span>
+  <div class="bar__right">
+    <a class="lang" href="../" hreflang="en" lang="en">English</a>
+    <button class="toggle" id="toggle" aria-pressed="false"
+            data-raw="mostra il raw" data-styled="mostra lo stile">
+      <b>#</b> <span id="toggle-label">mostra il raw</span> <span aria-hidden="true">·</span> R
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <img class="mark" src="../icon.png" alt="dexEdit" width="84" height="84">
+
+    <h1><span class="mk"># </span>dexEdit</h1>
+    <p class="lede">Un posto veloce dove mettere le note.</p>
+
+    <p class="say">
+      Ogni nota è un file <strong>.md</strong> in una cartella che hai scelto tu.
+      Aprilo con qualsiasi altra cosa. Spostalo dove vuoi. Cancella l'app domani
+      e ogni nota che hai scritto è ancora esattamente dove l'hai lasciata.
+    </p>
+
+    <form class="signup" id="signup"
+          data-subject="Lista d'attesa dexEdit"
+          data-mail-body="Avvisami quando dexEdit esce."
+          data-failed="Non è partita — riprova">
+      <input id="email" type="email" name="email" placeholder="tu@esempio.it"
+             required autocomplete="email" aria-label="Email">
+      <button type="submit">Avvisami quando esce</button>
+    </form>
+    <p class="fine" id="fine">Mac, iPhone e iPad. Nessun account, nessuna newsletter — una mail, una volta.</p>
+    <p class="said" id="said" hidden>Grazie. Una mail sola, quando ci sarà davvero qualcosa da scaricare.</p>
+  </div>
+
+  <section>
+    <h2><span class="mk">## </span>File, non un database</h2>
+    <p>
+      Quasi tutte le app di note tengono quello che scrivi in una forma che solo
+      loro sanno leggere, e come consolazione ti offrono un bottone "esporta".
+      dexEdit ha un formato solo: testo markdown, in memoria e su disco, senza
+      nessuna conversione in mezzo.
+    </p>
+    <p>
+      Quindi <em>styled</em> e <em>raw</em> non sono due documenti. Sono due modi
+      di disegnare gli stessi caratteri — i marcatori restano nel testo e si
+      tolgono di mezzo, invece di sparire dietro un'anteprima. È esattamente
+      quello che il bottone in cima sta facendo a questa pagina.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>Aperta prima che tu abbia finito di pensare</h2>
+    <p>
+      Metti <strong>Nuova nota</strong> nel Centro di Controllo, sulla schermata
+      di blocco o sul tasto Azione dell'iPhone. Una pressione e c'è già un cursore
+      che aspetta: niente schermata home, nessuna icona da cercare, nessuna
+      schermata vuota da togliere di mezzo prima.
+    </p>
+    <p>
+      Non c'è nemmeno un bottone "salva". Smetti di scrivere ed è già scritto. Il
+      file si dà da solo il nome del tuo primo titolo, e se lo cambia quando
+      cambi idea.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>iCloud, detta onestamente</h2>
+    <p>
+      Tieni la cartella su iCloud Drive e il Mac, l'iPhone e l'iPad leggono
+      esattamente gli stessi file. Non una copia, non un nostro servizio di
+      sincronizzazione in mezzo: non c'è nessun server qui a tenersi le tue note.
+    </p>
+    <ul class="list">
+      <li><span class="mk">- </span>Una nota che non è ancora scesa su questo dispositivo resta in elenco, segnata come in attesa. Non sparisce mai in silenzio.</li>
+      <li><span class="mk">- </span>Una modifica fatta su un altro dispositivo compare mentre stai guardando l'elenco, senza che tu tocchi niente.</li>
+      <li><span class="mk">- </span>Scrivi su due dispositivi mentre uno è offline e tieni entrambe le versioni, una accanto all'altra. Nessuno sceglie per te di nascosto.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>Quello che non farà mai</h2>
+    <p class="nots">
+      <s>account</s><br>
+      <s>tracciamento, analytics, telemetria</s><br>
+      <s>un server che si tiene le tue note</s><br>
+      <s>plugin</s><br>
+      <s>temi</s><br>
+      <s>intelligenza artificiale di qualsiasi tipo</s><br>
+      <s>tag, backlink, vista a grafo</s>
+    </p>
+    <p>
+      Questo elenco è la funzionalità. Ogni riga è una cosa che avrebbe reso
+      l'app più lenta ad aprirsi, più difficile da spiegare, o un posto peggiore
+      dove lasciare qualcosa che potresti rivolere fra dieci anni.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>Non è ancora uscita</h2>
+    <p>
+      È costruita ed è in uso quotidiano, su tutti e tre. Quello che manca è la
+      parte che fa Apple. Lascia un indirizzo e riceverai una mail sola, il
+      giorno in cui potrai davvero scaricarla.
+    </p>
+    <form class="signup" id="signup2"
+          data-subject="Lista d'attesa dexEdit"
+          data-mail-body="Avvisami quando dexEdit esce."
+          data-failed="Non è partita — riprova">
+      <input type="email" name="email" placeholder="tu@esempio.it"
+             required autocomplete="email" aria-label="Email">
+      <button type="submit">Avvisami quando esce</button>
+    </form>
+    <p class="fine">Nessuna newsletter. Nessun “abbiamo aggiornato la privacy policy”. Una mail.</p>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <p>dexEdit <span class="mk">·</span> fatta in Italia <span class="mk">·</span>
+    <a href="mailto:hellodave@espertini.com">hellodave@espertini.com</a></p>
+</footer>
+
+<script src="../site.js"></script>
+</body>
+</html>
