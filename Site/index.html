@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dexEdit — a fast place to put notes</title>
+<meta name="description" content="A markdown notes app for Mac, iPhone and iPad. Every note is a plain .md file on your own disk. No account, no server, nothing to export.">
+<link rel="icon" href="icon.png">
+
+<meta property="og:title" content="dexEdit — a fast place to put notes">
+<meta property="og:description" content="Every note is a plain .md file on your own disk. No account, no server, nothing to export.">
+<meta property="og:image" content="icon.png">
+<meta property="og:type" content="website">
+
+<style>
+/* ---------------------------------------------------------------------------
+   dexEdit — one page, no dependencies, no network requests.
+
+   The type is deliberately not a webfont. Everyone this page is written for is
+   already holding a device that ships Iowan Old Style and SF Mono, so the page
+   paints on the first frame with nothing to download and no reflow. The
+   fallbacks are for everyone else.
+--------------------------------------------------------------------------- */
+
+:root {
+  --serif: "Iowan Old Style", "Charter", "Palatino", "Georgia", serif;
+  --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+
+  --paper: #faf8f5;
+  --ink: #16141d;
+  --ink-soft: #5b5768;
+  --rule: #e4dfd7;
+  --indigo: #4f46e5;
+  --indigo-lift: #7b72f0;
+  --amber: #f5a623;
+
+  /* The label on the indigo button. It flips with the theme rather than
+     staying white: on the lighter indigo the dark mode needs, white text
+     lands around 2.9:1 and fails outright. */
+  --on-indigo: #ffffff;
+
+  /* Markers are dimmed, never hidden. That is the whole idea of the app, and
+     it is the one colour decision this page cannot get wrong. */
+  --marker: #b9b2c6;
+
+  --measure: 34rem;
+  --step: clamp(1.05rem, 0.98rem + 0.3vw, 1.18rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #100e16;
+    --ink: #ece9f2;
+    --ink-soft: #9d96ad;
+    --rule: #2a2536;
+    --indigo: #8b83f5;
+    --indigo-lift: #a9a2ff;
+    --marker: #554f66;
+    --on-indigo: #100e16;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: var(--step);
+  line-height: 1.62;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The markdown marker. Present in the text, dimmed out of the way — exactly
+   what the editor does to a heading's hashes. */
+.mk {
+  color: var(--marker);
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 0.78em;
+  letter-spacing: -0.02em;
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+/* ---- the switch ---------------------------------------------------------- */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.5rem;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.bar__name {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+.toggle {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.32rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.toggle:hover { border-color: var(--indigo); color: var(--indigo); }
+.toggle:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.toggle b { color: var(--amber); font-weight: 400; }
+
+/* ---- hero ---------------------------------------------------------------- */
+
+.hero { padding: clamp(3rem, 9vw, 6.5rem) 0 clamp(2.5rem, 6vw, 4rem); }
+
+.mark {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  display: block;
+  margin-bottom: 1.6rem;
+  box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--indigo) 55%, transparent);
+}
+
+h1 {
+  font-size: clamp(2.6rem, 7vw, 3.9rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.lede {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  line-height: 1.4;
+  color: var(--ink-soft);
+  margin: 0 0 1.6rem;
+  max-width: 26ch;
+}
+
+.hero p.say { margin: 0 0 2rem; }
+
+/* ---- sections ------------------------------------------------------------ */
+
+section { padding: clamp(2.4rem, 6vw, 3.6rem) 0; border-top: 1px solid var(--rule); }
+
+h2 {
+  font-size: clamp(1.5rem, 3.6vw, 1.9rem);
+  line-height: 1.15;
+  letter-spacing: -0.018em;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+p { margin: 0 0 1.1rem; }
+p:last-child { margin-bottom: 0; }
+
+strong { font-weight: 600; }
+em { font-style: italic; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+
+/* Hanging indent, so a wrapped line lines up with the text and not with the
+   dash — the marker sits in the margin the way it does in the editor. */
+.list li {
+  padding-left: 1.25rem;
+  text-indent: -1.25rem;
+  margin-bottom: 0.7rem;
+}
+
+.list li:last-child { margin-bottom: 0; }
+
+/* The "what it isn't" list, set as struck-through markdown. An app that says
+   what it refuses to do is making a promise, so it gets to look like one. */
+.nots { font-family: var(--mono); font-size: 0.92rem; line-height: 1.9; }
+.nots s { color: var(--ink-soft); text-decoration-color: var(--marker); }
+
+/* ---- waitlist ------------------------------------------------------------ */
+
+.signup { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.7rem; }
+
+.signup input {
+  flex: 1 1 15rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+}
+
+.signup input::placeholder { color: var(--marker); }
+.signup input:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; border-color: transparent; }
+
+.signup button {
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--on-indigo);
+  background: var(--indigo);
+  border: 0;
+  border-radius: 10px;
+  padding: 0.7rem 1.3rem;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.signup button:hover { background: var(--indigo-lift); }
+.signup button:active { transform: translateY(1px); }
+.signup button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.fine { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-soft); margin: 0; }
+
+.said { color: var(--indigo); font-family: var(--mono); font-size: 0.86rem; }
+[hidden] { display: none !important; }
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 2.2rem 0 3.5rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+footer a { color: inherit; text-decoration-color: var(--marker); text-underline-offset: 3px; }
+footer a:hover { color: var(--indigo); }
+
+/* ---- raw ------------------------------------------------------------------
+   The page flips to the same characters, drawn plainly. Nothing here changes
+   any text — only how it is painted, which is the promise the app makes about
+   your notes. Turn it on and the markers you were ignoring are simply there.
+--------------------------------------------------------------------------- */
+
+body.raw {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+body.raw h1,
+body.raw h2,
+body.raw .lede {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.75;
+  max-width: none;
+  color: var(--ink);
+}
+
+body.raw .mk { color: var(--amber); font-size: 1em; }
+body.raw strong { font-weight: 400; }
+body.raw em { font-style: normal; }
+body.raw .nots s { text-decoration: none; }
+body.raw .mark { border-radius: 0; box-shadow: none; filter: grayscale(1) contrast(0.85); }
+body.raw section { border-top-style: dashed; }
+body.raw .hero { padding-top: 2.5rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="bar">
+  <span class="bar__name">dexEdit</span>
+  <button class="toggle" id="toggle" aria-pressed="false">
+    <b>#</b> show raw <span aria-hidden="true">·</span> R
+  </button>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <img class="mark" src="icon.png" alt="dexEdit" width="84" height="84">
+
+    <h1><span class="mk"># </span>dexEdit</h1>
+    <p class="lede">A fast place to put notes.</p>
+
+    <p class="say">
+      Every note is a plain <strong>.md</strong> file sitting in a folder you chose.
+      Open it with anything else. Move it anywhere. Delete the app tomorrow and
+      every note you wrote is still exactly where you left it.
+    </p>
+
+    <form class="signup" id="signup">
+      <label class="visually-hidden" for="email" hidden>Email</label>
+      <input id="email" type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+      <button type="submit">Tell me when it ships</button>
+    </form>
+    <p class="fine" id="fine">Mac, iPhone and iPad. No account, no newsletter — one email, once.</p>
+    <p class="said" id="said" hidden>Thank you. One email, when there is something to download.</p>
+  </div>
+
+  <section>
+    <h2><span class="mk">## </span>Files, not a database</h2>
+    <p>
+      Most notes apps keep your writing in a shape only they can read, then offer
+      you an export button as consolation. dexEdit has exactly one format:
+      markdown text, in memory and on disk, with no conversion step anywhere
+      between them.
+    </p>
+    <p>
+      So <em>styled</em> and <em>raw</em> are not two documents. They are two ways
+      of drawing the same characters — the markers stay in the text and get out of
+      your way, rather than disappearing behind a rendering. That is what the
+      button at the top of this page is doing to this page.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>Open before you've finished thinking</h2>
+    <p>
+      Put <strong>New Note</strong> in Control Centre, on the Lock Screen, or on
+      the iPhone's Action button. One press and there is a cursor waiting — no
+      home screen, no app icon to find, no empty state to dismiss first.
+    </p>
+    <p>
+      There is no save button either. You stop typing, it's written. The file
+      names itself after your first heading and renames itself when you change
+      your mind.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>iCloud, honestly</h2>
+    <p>
+      Keep the folder in iCloud Drive and the Mac, the iPhone and the iPad read
+      the very same files. Not a copy, not a sync service of ours in the middle —
+      there is no server here to hold your notes on.
+    </p>
+    <ul class="list">
+      <li><span class="mk">- </span>A note that hasn't come down to this device yet stays in the list, marked as waiting. It never quietly vanishes.</li>
+      <li><span class="mk">- </span>An edit made on another device turns up while you're looking at the list, without touching anything.</li>
+      <li><span class="mk">- </span>Write on two devices while one is offline and you keep both versions, side by side. Nothing is silently chosen for you.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>What it will never do</h2>
+    <p class="nots">
+      <s>accounts</s><br>
+      <s>tracking, analytics, telemetry</s><br>
+      <s>a server that holds your notes</s><br>
+      <s>plugins</s><br>
+      <s>themes</s><br>
+      <s>AI anything</s><br>
+      <s>tags, backlinks, graph view</s>
+    </p>
+    <p>
+      This list is the feature. Every line on it is a thing that would have made
+      the app slower to open, harder to explain, or a worse place to leave
+      something you might want in ten years.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="mk">## </span>It isn't out yet</h2>
+    <p>
+      It is built and it is in daily use, on all three. What is left is the part
+      Apple does. Leave an address and you'll hear once, on the day you can
+      actually download it.
+    </p>
+    <form class="signup" id="signup2">
+      <input type="email" name="email" placeholder="you@example.com" required autocomplete="email" aria-label="Email">
+      <button type="submit">Tell me when it ships</button>
+    </form>
+    <p class="fine">No newsletter. No “we've updated our privacy policy”. One email.</p>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <p>dexEdit <span class="mk">·</span> made in Italy <span class="mk">·</span>
+    <a href="mailto:hellodave@espertini.com">hellodave@espertini.com</a></p>
+</footer>
+
+<script>
+/* -----------------------------------------------------------------------------
+   Two jobs, and neither of them rewrites any text.
+
+   1. The raw switch adds a class. That is all it does: the characters on this
+      page are the same in both states, which is the claim the page is making.
+   2. The waitlist. WAITLIST_ENDPOINT takes a POST from any form service —
+      Formspree, Buttondown, Tally, your own. Left empty, the form falls back to
+      opening a pre-addressed mail, so the page is never a dead end.
+----------------------------------------------------------------------------- */
+
+const WAITLIST_ENDPOINT = "";
+const WAITLIST_MAILTO = "hellodave@espertini.com";
+
+const body = document.body;
+const toggle = document.getElementById("toggle");
+
+function setRaw(on) {
+  body.classList.toggle("raw", on);
+  toggle.setAttribute("aria-pressed", String(on));
+  toggle.innerHTML = on
+    ? '<b>#</b> show styled <span aria-hidden="true">·</span> R'
+    : '<b>#</b> show raw <span aria-hidden="true">·</span> R';
+}
+
+toggle.addEventListener("click", () => setRaw(!body.classList.contains("raw")));
+
+document.addEventListener("keydown", (event) => {
+  // Not while someone is typing their address into the form.
+  const typing = event.target instanceof HTMLInputElement;
+  if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.key === "r" || event.key === "R") setRaw(!body.classList.contains("raw"));
+});
+
+for (const form of document.querySelectorAll(".signup")) {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = new FormData(form).get("email");
+
+    if (!WAITLIST_ENDPOINT) {
+      window.location.href =
+        `mailto:${WAITLIST_MAILTO}?subject=${encodeURIComponent("dexEdit waitlist")}` +
+        `&body=${encodeURIComponent(`Please tell me when dexEdit ships.\n\n${email}\n`)}`;
+      return;
+    }
+
+    const button = form.querySelector("button");
+    button.disabled = true;
+
+    try {
+      await fetch(WAITLIST_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      form.hidden = true;
+      document.getElementById("fine")?.setAttribute("hidden", "");
+      document.getElementById("said")?.removeAttribute("hidden");
+    } catch {
+      button.disabled = false;
+      button.textContent = "Didn't send — try again";
+    }
+  });
+}
+</script>
+
+</body>
+</html>
