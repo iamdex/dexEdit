@@ -23,10 +23,12 @@ struct ContentView: View {
         }
         .onAppear {
             library.setFolder(folderStore.folderURL)
+            library.adoptSharedCaptures()
             startQuickCaptureIfAsked()
         }
         .onChange(of: folderStore.folderURL) { _, newValue in
             library.setFolder(newValue)
+            library.adoptSharedCaptures()
             startQuickCaptureIfAsked()
         }
         // Both, because the control can arrive either way round: a cold launch

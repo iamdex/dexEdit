@@ -843,6 +843,56 @@ final class NotesLibrary: ObservableObject {
         }
     }
 
+    // MARK: - Shared captures
+
+    /// Turns anything the share extension left behind into real notes.
+    ///
+    /// The extension has no way into the notes folder, so it leaves what you
+    /// shared in a place both sides can see. This is the other half: each item
+    /// becomes an ordinary note, named and filed by the same rules as one you
+    /// typed, and the hand-off file is deleted only once its note is on disk.
+    ///
+    /// Order matters here. Reading and deleting in one step would lose the text
+    /// if writing the note failed, so the file is taken only after the note is
+    /// written.
+    @discardableResult
+    func adoptSharedCaptures() -> Int {
+        guard let folderURL else { return 0 }
+
+        var adopted = 0
+        for handoff in SharedInbox.waiting() {
+            guard let text = try? String(contentsOf: handoff, encoding: .utf8),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
+                // Empty or unreadable: nothing to make a note out of, and
+                // leaving it would mean trying again forever.
+                _ = SharedInbox.take(handoff)
+                continue
+            }
+
+            let note = Note(fileURL: nil, text: text)
+            notes.insert(note, at: 0)
+            savedText[note.id] = ""
+            destinations[note.id] = folderURL
+            writeIfNeeded(note.id)
+
+            guard notes.first(where: { $0.id == note.id })?.fileURL != nil else {
+                // The write failed; leave the hand-off where it is and try
+                // again next time rather than dropping what was shared.
+                notes.removeAll { $0.id == note.id }
+                savedText.removeValue(forKey: note.id)
+                destinations.removeValue(forKey: note.id)
+                continue
+            }
+
+            _ = SharedInbox.take(handoff)
+            adopted += 1
+        }
+
+        if adopted > 0 { sortNotes() }
+        return adopted
+    }
+
     /// Writes and renames everything outstanding, right now.
     func flushPending() {
         let saving = pendingSaves.keys
@@ -913,6 +963,9 @@ final class NotesLibrary: ObservableObject {
         for name in Self.refreshTriggers {
             observers.append(
                 center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    // Coming back to the front is exactly when something was
+                    // shared into the app a moment ago from somewhere else.
+                    self?.adoptSharedCaptures()
                     self?.syncIfStale()
                 }
             )

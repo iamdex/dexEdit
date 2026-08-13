@@ -69,6 +69,8 @@ targets:
       - package: MarkdownCore
       - target: dexEditControls
         embed: true
+      - target: dexEditShare
+        embed: true
     sources:
       - path: iOS
       # The file layer is the same app on both platforms.
@@ -87,6 +89,7 @@ targets:
         # reachable from outside and can be moved into iCloud Drive.
         INFOPLIST_KEY_UIFileSharingEnabled: YES
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+        CODE_SIGN_ENTITLEMENTS: Resources/dexEditiOS.entitlements
 
   # One button, in Control Center, on the Lock Screen and on the Action button.
   # It carries no notes and asks for no file access: it only knows how to say
@@ -109,6 +112,25 @@ targets:
         INFOPLIST_FILE: Resources/dexEditControls-Info.plist
         SKIP_INSTALL: YES
 
+  # "Add to dexEdit", from any share sheet. It writes into the shared hand-off
+  # folder and nothing else — the notes folder belongs to the app.
+  dexEditShare:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: iOSShare
+      - path: Shared/SharedInbox.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.espertini.dexEdit.Share
+        PRODUCT_NAME: dexEditShare
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: dexEdit
+        INFOPLIST_FILE: Resources/dexEditShare-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/dexEditShare.entitlements
+        SKIP_INSTALL: YES
+
   dexEditTests:
     type: bundle.unit-test
     platform: macOS
@@ -121,6 +143,7 @@ targets:
       - path: Shared/CoordinatedFile.swift
       - path: Shared/FolderWatcher.swift
       - path: Shared/Reachability.swift
+      - path: Shared/SharedInbox.swift
       - path: Shared/LaunchTimer.swift
       - path: Tests
     settings:
