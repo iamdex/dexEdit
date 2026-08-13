@@ -2,13 +2,15 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The extension exists for one button, and is likely to keep existing for one
-/// button. A notes app's job is to be open before you have finished having the
-/// thought; anything more elaborate than that belongs in the app itself.
+/// The extension exists for one button, offered in every place iOS will take
+/// one: Control Centre, the Lock Screen, the Action button, the Home Screen. A
+/// notes app's job is to be open before you have finished having the thought;
+/// anything more elaborate than that belongs in the app itself.
 @main
 struct dexEditControls: WidgetBundle {
     var body: some Widget {
         NewNoteControl()
+        NewNoteWidget()
     }
 }
 
