@@ -603,6 +603,35 @@ final class NotesLibraryTests: XCTestCase {
         XCTAssertEqual(library.filteredNotes.count, 2)
     }
 
+    // MARK: - A folder that can't be read
+
+    func testAFolderThatCannotBeReadDoesNotEmptyTheList() throws {
+        try write("# One", to: "one.md")
+        try write("# Two", to: "two.md")
+        library.setFolder(folder)
+        XCTAssertEqual(library.notes.count, 2)
+
+        // Momentarily unreadable. An iCloud folder whose provider isn't ready
+        // yet looks exactly like this from in here, and "I couldn't look" must
+        // never be mistaken for "there is nothing there".
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0], ofItemAtPath: folder.path
+        )
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: folder.path
+            )
+        }
+
+        library.syncWithDisk()
+
+        XCTAssertEqual(library.notes.count, 2, "an unreadable folder is not an empty one")
+        XCTAssertEqual(
+            Set(library.notes.map(\.summary.title)), ["One", "Two"],
+            "and the notes are still themselves"
+        )
+    }
+
     // MARK: - Noticing someone else
 
     func testANoteWrittenByAnotherWriterArrivesWithoutBeingAskedFor() throws {

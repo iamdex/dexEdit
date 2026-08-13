@@ -120,7 +120,8 @@ final class NotesLibrary: ObservableObject {
     private func loadFromDisk() {
         guard folderURL != nil else { return }
 
-        let urls = splittingConflicts(markdownFiles())
+        guard let files = markdownFiles() else { return }
+        let urls = splittingConflicts(files)
         var loaded: [Note] = []
 
         CoordinatedFile.batchReading(urls) {
@@ -170,33 +171,53 @@ final class NotesLibrary: ObservableObject {
 
     /// Every .md file under the notes folder, at any depth. Notes sitting in a
     /// subfolder used to be invisible to the app rather than merely unsorted.
-    private func markdownFiles() -> [URL] {
-        guard let folderURL else { return [] }
+    /// nil when the folder could not be read at all — which is not the same
+    /// answer as "there are no notes in it", and must never be confused with
+    /// it. A folder in iCloud is briefly unreadable more often than you would
+    /// think: right after launch, while the provider is still waking up.
+    private func markdownFiles() -> [URL]? {
+        guard let folderURL else { return nil }
 
         // Under a claim on the folder, so the file provider reconciles before
         // being asked what's in there. Without it the listing is whatever it
         // last cached, and a note from another device never appears at all.
-        var found: [URL] = []
+        var found: [URL]?
         CoordinatedFile.readingDirectory(folderURL) {
             found = enumerateMarkdown(in: folderURL)
         }
         return found
     }
 
-    private func enumerateMarkdown(in folderURL: URL) -> [URL] {
+    private func enumerateMarkdown(in folderURL: URL) -> [URL]? {
+        var failed = false
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: [.skipsHiddenFiles, .skipsPackageDescendants],
+            errorHandler: { _, _ in
+                // The load-bearing part. An unreadable folder does not make
+                // FileManager hand back nil — it hands back an enumerator that
+                // politely yields nothing, which reads as "no notes here" and
+                // is how the list came to be emptied. This is the only place
+                // the difference is visible.
+                failed = true
+                return false
+            }
         ) else {
             errorMessage = "Couldn’t read the notes folder."
-            return []
+            return nil
         }
 
-        return enumerator
+        let found = enumerator
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension.lowercased() == "md" }
             .map { $0.resolvingSymlinksInPath() }
+
+        if failed {
+            errorMessage = "Couldn’t read the notes folder."
+            return nil
+        }
+        return found
     }
 
     /// The same files, plus a file for every side of an iCloud clash that was
@@ -220,17 +241,20 @@ final class NotesLibrary: ObservableObject {
     /// Every subfolder of the notes folder, empty ones included — the folder
     /// view has to show a folder the moment it exists, not once it has a note
     /// in it. Read from disk, not derived from note paths.
+    /// Keeps the folders it already knows about when the tree can't be read,
+    /// for the same reason the notes are kept: an unanswerable question is not
+    /// an answer of "none".
     private func scanFolders() -> [URL] {
         guard let folderURL else { return [] }
 
-        var found: [URL] = []
+        var found: [URL]?
         CoordinatedFile.readingDirectory(folderURL) {
             found = enumerateFolders(in: folderURL)
         }
-        return found
+        return found ?? folders
     }
 
-    private func enumerateFolders(in folderURL: URL) -> [URL] {
+    private func enumerateFolders(in folderURL: URL) -> [URL]? {
         guard let enumerator = FileManager.default.enumerator(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -671,7 +695,11 @@ final class NotesLibrary: ObservableObject {
         // Commit our own work first, so "newer on disk" means what it says.
         flushPending()
 
-        let onDisk = splittingConflicts(markdownFiles())
+        // A folder we couldn't read tells us nothing, so we conclude nothing.
+        // Reading an empty answer as "every note was deleted" would empty the
+        // list over a folder that is merely busy.
+        guard let files = markdownFiles() else { return }
+        let onDisk = splittingConflicts(files)
         let present = Set(onDisk.map(\.standardizedFileURL))
         var changed = false
 
@@ -695,11 +723,15 @@ final class NotesLibrary: ObservableObject {
             }
         }
 
-        // Whatever is still missing really is gone.
+        // Whatever is still missing might really be gone — but ask the file
+        // itself before saying so. A listing can omit a file that is sitting
+        // right there, and forgetting a note on the strength of one bad answer
+        // is the one mistake that looks exactly like losing it.
         let stillPresent = Set(onDisk.map(\.standardizedFileURL))
         for note in notes {
             guard let url = note.fileURL?.standardizedFileURL,
-                  !stillPresent.contains(url)
+                  !stillPresent.contains(url),
+                  !FileManager.default.fileExists(atPath: url.path)
             else { continue }
             notes.removeAll { $0.id == note.id }
             savedText.removeValue(forKey: note.id)
