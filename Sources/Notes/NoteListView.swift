@@ -100,7 +100,7 @@ struct NoteListView: View {
                 // where a note lives — including search results reached from
                 // the folder view.
                 ForEach(library.filteredNotes) { note in
-                    NoteRow(summary: note.summary, availability: note.availability, folder: library.folderLabel(for: note))
+                    NoteRow(summary: note.summary, availability: note.availability, isOnline: library.isOnline, folder: library.folderLabel(for: note))
                         .tag(note.id)
                 }
             }
@@ -171,7 +171,7 @@ private struct FolderRows: View {
 
             case .note(let id):
                 if let note = library.note(id) {
-                    NoteRow(summary: note.summary, availability: note.availability, folder: nil)
+                    NoteRow(summary: note.summary, availability: note.availability, isOnline: library.isOnline, folder: nil)
                         .tag(id)
                         .draggable(SidebarDrop.note(id))
                 }
@@ -266,6 +266,7 @@ private struct FolderActions: View {
 private struct NoteRow: View {
     let summary: Note.Summary
     let availability: Note.Availability
+    let isOnline: Bool
     /// Only set for notes that live in a subfolder; most rows show no badge.
     let folder: String?
 
@@ -300,10 +301,13 @@ private struct NoteRow: View {
 
     /// Nothing at all for a normal note. Only a note the app is holding but
     /// couldn't open needs to say so — it is still listed, and still there.
+    ///
+    /// A note waiting on iCloud says which kind of waiting it is doing: coming
+    /// down, or unable to until there's a connection.
     private var statusSymbol: String? {
         switch availability {
         case .ready: nil
-        case .notDownloaded: "arrow.down.circle"
+        case .notDownloaded: isOnline ? "arrow.down.circle" : "icloud.slash"
         case .unreadable: "exclamationmark.triangle"
         }
     }

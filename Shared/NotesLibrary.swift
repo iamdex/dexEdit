@@ -49,9 +49,22 @@ final class NotesLibrary: ObservableObject {
     private var lastReadFromDisk = Date.distantPast
     private static let syncCooldown: TimeInterval = 1.0
 
-    /// Runs only while a note is waiting on iCloud. See `watchForDownloads`.
+    /// Whether the device can reach a network. Only interesting here because a
+    /// note that hasn't arrived is a different thing depending on the answer.
+    @Published private(set) var isOnline = true
+
+    /// Runs only while a note is waiting on iCloud, and only while there is a
+    /// network for it to arrive over. See `watchForDownloads`.
     private var downloadWatcher: Timer?
-    private static let downloadPollInterval: TimeInterval = 2.0
+    private var downloadPoll = NotesLibrary.firstPoll
+
+    /// Quick at first, because most downloads land almost at once, then slower
+    /// and slower. A file that hasn't come in a minute is not going to come in
+    /// the next two seconds either, and asking anyway is somebody's battery.
+    private static let firstPoll: TimeInterval = 2.0
+    private static let slowestPoll: TimeInterval = 60.0
+
+    private let reachability = Reachability()
 
     /// Tells the app when someone else changes the folder, so a note written on
     /// another device turns up without the app being brought to the front.
@@ -70,6 +83,18 @@ final class NotesLibrary: ObservableObject {
 
     init() {
         observeFlushEvents()
+
+        isOnline = reachability.isOnline
+        reachability.onChange = { [weak self] online in
+            guard let self else { return }
+            self.isOnline = online
+            // Coming back deserves an immediate look rather than a wait for
+            // whatever the backoff had drifted out to: the notes that couldn't
+            // arrive are exactly the ones now able to.
+            self.downloadPoll = Self.firstPoll
+            if online { self.syncWithDisk() }
+            self.watchForDownloads()
+        }
     }
 
     deinit {
@@ -794,17 +819,27 @@ final class NotesLibrary: ObservableObject {
     private func watchForDownloads() {
         let waiting = notes.contains { $0.availability == .notDownloaded }
 
-        guard waiting else {
+        // Nothing pending, or nothing that could arrive. With no network the
+        // file provider has no more to tell us than it did a second ago, and
+        // the note already says so on screen.
+        guard waiting, isOnline else {
             downloadWatcher?.invalidate()
             downloadWatcher = nil
+            downloadPoll = Self.firstPoll
             return
         }
         guard downloadWatcher == nil else { return }
 
         downloadWatcher = Timer.scheduledTimer(
-            withTimeInterval: Self.downloadPollInterval, repeats: true
+            withTimeInterval: downloadPoll, repeats: false
         ) { [weak self] _ in
-            self?.syncWithDisk()
+            guard let self else { return }
+            self.downloadWatcher = nil
+            self.downloadPoll = min(self.downloadPoll * 2, Self.slowestPoll)
+            // Which re-arms this, at the longer interval, if anything is still
+            // waiting — and stops asking entirely once nothing is.
+            self.syncWithDisk()
+            self.watchForDownloads()
         }
     }
 

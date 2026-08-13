@@ -120,7 +120,7 @@ private struct EditorPane: View {
                     // never reaches back into the note you just left.
                     .id(id)
                 } else {
-                    UnopenedNoteView(note: note)
+                    UnopenedNoteView(note: note, isOnline: library.isOnline)
                 }
             } else {
                 VStack(spacing: 6) {
@@ -155,6 +155,7 @@ private struct EditorPane: View {
 /// sitting in iCloud, perfectly intact.
 private struct UnopenedNoteView: View {
     let note: Note
+    let isOnline: Bool
 
     var body: some View {
         VStack(spacing: 8) {
@@ -175,13 +176,20 @@ private struct UnopenedNoteView: View {
 
     private var symbol: String {
         switch note.availability {
-        case .notDownloaded: "icloud.and.arrow.down"
+        case .notDownloaded: isOnline ? "icloud.and.arrow.down" : "icloud.slash"
         default: "exclamationmark.triangle"
         }
     }
 
+    /// Waiting for something on its way and waiting for something that cannot
+    /// come are different situations, and saying so is the difference between
+    /// patience and worry.
     private var message: String {
         switch note.availability {
+        case .notDownloaded where !isOnline:
+            "This note is in iCloud and hasn’t reached this device. "
+                + "There’s no connection at the moment, so it can’t arrive until there is one. "
+                + "Nothing is lost — it’s waiting."
         case .notDownloaded:
             "This note is in iCloud and hasn’t reached this device yet. "
                 + "It will open by itself once it arrives."

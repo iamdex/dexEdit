@@ -120,6 +120,7 @@ targets:
       - path: Shared/NotesLibrary.swift
       - path: Shared/CoordinatedFile.swift
       - path: Shared/FolderWatcher.swift
+      - path: Shared/Reachability.swift
       - path: Shared/LaunchTimer.swift
       - path: Tests
     settings:

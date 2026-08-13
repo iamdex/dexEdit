@@ -66,7 +66,7 @@ struct NoteListView: View {
                 }
             } else {
                 ForEach(library.filteredNotes) { note in
-                    NoteRow(summary: note.summary, availability: note.availability, folder: library.folderLabel(for: note))
+                    NoteRow(summary: note.summary, availability: note.availability, isOnline: library.isOnline, folder: library.folderLabel(for: note))
                         .tag(note.id)
                         .draggable(SidebarDrop.note(note.id))
                 }
@@ -174,7 +174,7 @@ private struct FolderRows: View {
 
             case .note(let id):
                 if let note = library.note(id) {
-                    NoteRow(summary: note.summary, availability: note.availability, folder: nil)
+                    NoteRow(summary: note.summary, availability: note.availability, isOnline: library.isOnline, folder: nil)
                         .tag(id)
                         .draggable(SidebarDrop.note(id))
                 }
@@ -279,6 +279,7 @@ private struct FolderLabel: View {
 private struct NoteRow: View {
     let summary: Note.Summary
     let availability: Note.Availability
+    let isOnline: Bool
     let folder: String?
 
     var body: some View {
@@ -315,7 +316,7 @@ private struct NoteRow: View {
     private var statusSymbol: String? {
         switch availability {
         case .ready: nil
-        case .notDownloaded: "arrow.down.circle"
+        case .notDownloaded: isOnline ? "arrow.down.circle" : "icloud.slash"
         case .unreadable: "exclamationmark.triangle"
         }
     }
